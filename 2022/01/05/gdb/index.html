@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>GDB常用命令</title>
+<meta name="keywords" content="GDB常用命令, Hexo">
+<meta name="description" content="GDB调试-从入门实践到原理
+#GDB #Linux 
+
+gcc -g t1.c -o t1
+需要加 -g 来产生调试符号, 否则GDB会出现 Make breakpoint pending on future shared library">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="GDB常用命令">
+<meta property="og:description" content="GDB调试-从入门实践到原理
+#GDB #Linux 
+
+gcc -g t1.c -o t1
+需要加 -g 来产生调试符号, 否则GDB会出现 Make breakpoint pending on future shared library">
+
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="http://example.com">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="http://example.com">
+        <h1 class="site-title">Hexo</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">GDB常用命令</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2022-01-05</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/GDB/">
+              GDB
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <p><a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s?__biz=Mzk0MzI4OTI1Ng==&mid=2247486816&idx=1&sn=a6dfc1361ce15ce5ad1c7d7734f9c939&chksm=c3376ba7f440e2b18267c303c35572ab089fb97d3b2fe0adb58009637d6631020bb52bd9a28c&mpshare=1&scene=23&srcid=01051o6nvEZy8CiMkGqe21L1&sharer_sharetime=1641358839534&sharer_shareid=59b77bb81921eb41ef126368348abb4d#rd">GDB调试-从入门实践到原理</a></p>
+<p>#GDB #Linux </p>
+<hr>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">gcc -g t1.c -o t1</span><br></pre></td></tr></table></figure>
+<p>需要加 <em>-g</em> 来产生调试符号, 否则GDB会出现 <em>Make breakpoint pending on future shared library load?</em></p>
+<h2 id="断点"><a href="#断点" class="headerlink" title="断点"></a>断点</h2><h3 id="breakpoint"><a href="#breakpoint" class="headerlink" title="breakpoint"></a>breakpoint</h3><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>break [file]:function</code></td>
+<td>在文件 <em>file</em> 的 <em>function</em> 函数入口设置断点</td>
+</tr>
+<tr>
+<td><code>break [file]:line</code></td>
+<td>在文件 <em>file</em> 的第 <em>line</em> 行设置断点</td>
+</tr>
+<tr>
+<td><code>info breakpoints</code></td>
+<td>查看断点列表</td>
+</tr>
+<tr>
+<td><code>break [+-]offset</code></td>
+<td>在当前位置偏移量为 <em>[+-]offset</em> 处设置断点</td>
+</tr>
+<tr>
+<td><code>break \*addr</code></td>
+<td>在地址 <em>addr</em> 处设置断点</td>
+</tr>
+<tr>
+<td><code>break ... if expr</code></td>
+<td>设置条件断点, 仅仅在条件满足时</td>
+</tr>
+<tr>
+<td><code>ignore n count</code></td>
+<td>接下来对于编号为n的断点忽略 <em>count</em> 次</td>
+</tr>
+<tr>
+<td><code>clear</code></td>
+<td>删除所有断点</td>
+</tr>
+<tr>
+<td><code>clear function</code></td>
+<td>删除所有位于 <em>function</em> 内的断点</td>
+</tr>
+<tr>
+<td><code>delete n</code></td>
+<td>删除指定编号的断点</td>
+</tr>
+<tr>
+<td><code>enable n</code></td>
+<td>启用指定编号的断点</td>
+</tr>
+<tr>
+<td><code>disable n</code></td>
+<td>禁用指定编号的断点</td>
+</tr>
+<tr>
+<td><code>save breakpoints file</code></td>
+<td>保存断点信息到指定文件</td>
+</tr>
+<tr>
+<td><code>source file</code></td>
+<td>导入文件中保存的断点信息</td>
+</tr>
+<tr>
+<td><code>break</code></td>
+<td>在下一个指令处设置断点</td>
+</tr>
+<tr>
+<td><code>clear [file:]line</code></td>
+<td>删除第 <em>line</em> 行的断点</td>
+</tr>
+</tbody></table>
+<h3 id="watchpoint"><a href="#watchpoint" class="headerlink" title="watchpoint"></a>watchpoint</h3><p><em>watchpoint</em> 要求GDB暂停程序执行的命令。区别在于 <em>watchpoint</em> <strong>没有驻留</strong>某一行源代码中, 而是指示GDB每当某个表达式改变了值就<strong>暂停执行</strong>的命令</p>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>watch variable</code></td>
+<td>设置变量数据断点</td>
+</tr>
+<tr>
+<td><code>watch var1 + var2</code></td>
+<td>设置表达式数据断点</td>
+</tr>
+<tr>
+<td><code>rwatch variable</code></td>
+<td>设置读断点, 仅支持硬件实现</td>
+</tr>
+<tr>
+<td><code>awatch variable</code></td>
+<td>设置读写断点, 仅支持硬件实现</td>
+</tr>
+<tr>
+<td><code>info watchpoints</code></td>
+<td>查看数据断点列表</td>
+</tr>
+<tr>
+<td><code>set can-use-hw-watchpoints 0</code></td>
+<td>强制基于软件方式实现</td>
+</tr>
+</tbody></table>
+<p>使用数据断点时, 需要注意：</p>
+<ul>
+<li>当监控变量为局部变量时, 一旦局部变量失效, 数据断点也会失效</li>
+<li>如果监控的是指针变量 <em>p</em>, 则 <code>watch *p</code> 监控的是 <em>p</em> 所指内存数据的变化情况, 而 <code>watch p</code> 监控的是 <em>p</em> 指针本身有没有改变指向</li>
+</ul>
+<p>最常见的数据断点应用场景：<strong>「定位堆上的结构体内部成员何时被修改」</strong></p>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>print &amp;variable</code></td>
+<td>查看变量的内存地址</td>
+</tr>
+<tr>
+<td><code>watch \*(type \*)address</code></td>
+<td>通过内存地址间接设置断点</td>
+</tr>
+<tr>
+<td><code>watch -l variable</code></td>
+<td>指定 <em>location</em> 参数</td>
+</tr>
+<tr>
+<td><code>watch variable thread 1</code></td>
+<td>仅编号为1的线程修改变量var值时会中断</td>
+</tr>
+</tbody></table>
+<h3 id="catchpoint"><a href="#catchpoint" class="headerlink" title="catchpoint"></a>catchpoint</h3><p>主要监测信号的产生, 例如 c++ 的 <code>throw</code> , 或者加载库的时候, 产生断点行为</p>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>catch fork</code></td>
+<td>程序调用 <em>fork</em> 时中断</td>
+</tr>
+<tr>
+<td><code>tcatch fork</code></td>
+<td>设置的断点只触发一次, 之后被自动删除</td>
+</tr>
+<tr>
+<td><code>catch syscall ptrace</code></td>
+<td>为 <em>ptrace</em> 系统调用设置断点</td>
+</tr>
+</tbody></table>
+<h2 id="命令行"><a href="#命令行" class="headerlink" title="命令行"></a>命令行</h2><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>run arglist</code></td>
+<td>以 <em>arglist</em> 为参数列表运行程序</td>
+</tr>
+<tr>
+<td><code>set args arglist</code></td>
+<td>指定启动命令行参数</td>
+</tr>
+<tr>
+<td><code>set args</code></td>
+<td>指定空的参数列表</td>
+</tr>
+<tr>
+<td><code>show args</code></td>
+<td>打印命令行列表</td>
+</tr>
+</tbody></table>
+<h2 id="程序栈"><a href="#程序栈" class="headerlink" title="程序栈"></a>程序栈</h2><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>backtrace [n]</code></td>
+<td>打印栈帧</td>
+</tr>
+<tr>
+<td><code>frame [n]</code></td>
+<td>选择第 <em>n</em> 个栈帧, 如果不存在, 则打印当前栈帧</td>
+</tr>
+<tr>
+<td><code>up n</code></td>
+<td>选择当前栈帧编号 <em>+n</em> 的栈帧</td>
+</tr>
+<tr>
+<td><code>down n</code></td>
+<td>选择当前栈帧编号 <em>-n</em> 的栈帧</td>
+</tr>
+<tr>
+<td><code>info frame [addr]</code></td>
+<td>描述当前选择的栈帧</td>
+</tr>
+<tr>
+<td><code>info args</code></td>
+<td>当前栈帧的参数列表</td>
+</tr>
+<tr>
+<td><code>info locals</code></td>
+<td>当前栈帧的局部变量</td>
+</tr>
+</tbody></table>
+<h2 id="多进程、多线程"><a href="#多进程、多线程" class="headerlink" title="多进程、多线程"></a>多进程、多线程</h2><h3 id="多进程"><a href="#多进程" class="headerlink" title="多进程"></a>多进程</h3><p>GDB在调试多进程程序（程序含 <em>fork</em> 调用）时, 默认只追踪父进程。可以通过命令设置, 实现只追踪父进程或子进程, 或者同时调试父进程和子进程。</p>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>info inferiors</code></td>
+<td>查看进程列表</td>
+</tr>
+<tr>
+<td><code>attach pid</code></td>
+<td>绑定进程 <em>id</em></td>
+</tr>
+<tr>
+<td><code>inferior num</code></td>
+<td>切换到指定进程上进行调试</td>
+</tr>
+<tr>
+<td><code>print $\_exitcode</code></td>
+<td>显示程序退出时的返回值</td>
+</tr>
+<tr>
+<td><code>set follow-fork-mode child</code></td>
+<td>追踪子进程</td>
+</tr>
+<tr>
+<td><code>set follow-fork-mode parent</code></td>
+<td>追踪父进程</td>
+</tr>
+<tr>
+<td><code>set detach-on-fork on</code></td>
+<td><em>fork</em> 调用时只追踪其中一个进程</td>
+</tr>
+<tr>
+<td><code>set detach-on-fork off</code></td>
+<td><em>fork</em> 调用时会同时追踪父子进程</td>
+</tr>
+</tbody></table>
+<h3 id="多线程"><a href="#多线程" class="headerlink" title="多线程"></a>多线程</h3><p>默认调试多线程时, **<u>一旦程序中断, 所有线程都将暂停</u>**。如果此时再继续执行当前线程, 其他线程也会同时执行</p>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>info threads</code></td>
+<td>查看线程列表</td>
+</tr>
+<tr>
+<td><code>print $\_thread</code></td>
+<td>显示当前正在调试的线程编号</td>
+</tr>
+<tr>
+<td><code>set scheduler-locking on</code></td>
+<td>调试一个线程时, 其他线程暂停执行</td>
+</tr>
+<tr>
+<td><code>set scheduler-locking off</code></td>
+<td>调试一个线程时, 其他线程同步执行</td>
+</tr>
+<tr>
+<td><code>set scheduler-locking step</code></td>
+<td>仅用 <em>step</em> 调试线程时其他线程不执行, 用其他命令如 <em>next</em> 调试时仍执行</td>
+</tr>
+</tbody></table>
+<p>如果只关心当前线程, 建议临时设置 <code>scheduler-locking</code> 为 <code>on</code>, 避免其他线程同时运行, 导致命中其他断点分散注意力</p>
+<h2 id="打印输出"><a href="#打印输出" class="headerlink" title="打印输出"></a>打印输出</h2><p>在调试的过程中, 我们需要查看某个变量的值, 以分析其是否符合预期, 这个时候就需要打印输出变量值</p>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>whatis variable</code></td>
+<td>查看变量的类型</td>
+</tr>
+<tr>
+<td><code>ptype variable</code></td>
+<td>查看变量详细的类型信息</td>
+</tr>
+<tr>
+<td><code>info variables var</code></td>
+<td>查看定义该变量的文件, 不支持局部变量</td>
+</tr>
+</tbody></table>
+<h3 id="打印字符串"><a href="#打印字符串" class="headerlink" title="打印字符串"></a>打印字符串</h3><p>使用 <code>x/s</code> 命令打印 <em>ASCII</em> 字符串, 如果是宽字符字符串, 需要先看宽字符的长度 <code>print sizeof(str)</code>：如果长度为 <code>2</code>, 则使用 <code>x/hs</code> 打印；如果长度为 <code>4</code> , 则使用 <code>x/ws</code> 打印</p>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>x/s str</code></td>
+<td>打印字符串</td>
+</tr>
+<tr>
+<td><code>set print elements 0</code></td>
+<td>打印不限制字符串长度&#x2F;或不限制数组长度</td>
+</tr>
+<tr>
+<td><code>call printf(&quot;%s\n&quot;,xxx)</code></td>
+<td>这时打印出的字符串不会含有多余的转义符</td>
+</tr>
+<tr>
+<td><code>printf &quot;%s\n&quot;,xxx</code></td>
+<td>同上</td>
+</tr>
+</tbody></table>
+<h3 id="打印数组"><a href="#打印数组" class="headerlink" title="打印数组"></a>打印数组</h3><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>print \*array@10</code></td>
+<td>打印从数组开头连续10个元素的值</td>
+</tr>
+<tr>
+<td><code>print array[60]@10</code></td>
+<td>打印array数组下标从60开始的10个元素, 即第60~69个元素</td>
+</tr>
+<tr>
+<td><code>set print array-indexes on</code></td>
+<td>打印数组元素时, 同时打印数组的下标</td>
+</tr>
+</tbody></table>
+<h3 id="打印指针"><a href="#打印指针" class="headerlink" title="打印指针"></a>打印指针</h3><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>print ptr</code></td>
+<td>查看该指针指向的类型及指针地址</td>
+</tr>
+<tr>
+<td><code>print \*(struct xxx \*)ptr</code></td>
+<td>查看指向的结构体的内容</td>
+</tr>
+</tbody></table>
+<h3 id="打印指定内存地址的值"><a href="#打印指定内存地址的值" class="headerlink" title="打印指定内存地址的值"></a>打印指定内存地址的值</h3><p>使用 <code>x</code> 命令来打印内存的值, 格式为 <code>x/nfu addr</code> , 以 <code>f</code> 格式打印从 <em>addr</em> 开始的 <code>n</code> 个长度单元为<code>u</code>的内存值：</p>
+<ul>
+<li><code>n</code>：输出单元的个数</li>
+<li><code>f</code>：输出格式, 如 <code>x</code> 表示以 <em>16</em> 进制输出, <code>o</code> 表示以 <em>8</em> 进制输出, 默认为<code>x</code></li>
+<li><code>u</code>：一个单元的长度, <code>b</code> 表示 <em>1</em> 个 <em>byte</em> , <code>h</code> 表示 <em>2</em> 个 <em>byte (half word)</em>, <code>w</code> 表示 <em>4</em> 个 <em>byte</em>, <code>g</code> 表示 <em>8</em> 个 <em>byte (giant word)</em></li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>x/8xb array</code></td>
+<td>以16进制打印数组 <em>array</em> 的前8个 <em>byte</em> 的值</td>
+</tr>
+<tr>
+<td><code>x/8xw array</code></td>
+<td>以16进制打印数组 <em>array</em> 的前16个 <em>word</em> 的值</td>
+</tr>
+</tbody></table>
+<h3 id="打印局部变量"><a href="#打印局部变量" class="headerlink" title="打印局部变量"></a>打印局部变量</h3><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>info locals</code></td>
+<td>打印当前函数局部变量的值</td>
+</tr>
+<tr>
+<td><code>backtrace full</code></td>
+<td>打印当前栈帧各个函数的局部变量值, 命令可缩写为 <code>bt</code></td>
+</tr>
+<tr>
+<td><code>bt full n</code></td>
+<td>从内到外显示 <em>n</em> 个栈帧及其局部变量</td>
+</tr>
+<tr>
+<td><code>bt full -n</code></td>
+<td>从外向内显示 <em>n</em> 个栈帧及其局部变量</td>
+</tr>
+</tbody></table>
+<h3 id="打印结构体"><a href="#打印结构体" class="headerlink" title="打印结构体"></a>打印结构体</h3><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>set print pretty on</code></td>
+<td>每行只显示结构体的一名成员</td>
+</tr>
+<tr>
+<td><code>set print null-stop</code></td>
+<td>不显示 <em>‘\000’</em> 这种</td>
+</tr>
+</tbody></table>
+<h2 id="函数跳转"><a href="#函数跳转" class="headerlink" title="函数跳转"></a>函数跳转</h2><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>set step-mode on</code></td>
+<td>不跳过不含调试信息的函数, 可以显示和调试汇编代码</td>
+</tr>
+<tr>
+<td><code>finish</code></td>
+<td>执行完当前函数并打印返回值, 然后触发中断</td>
+</tr>
+<tr>
+<td><code>return 0</code></td>
+<td>不再执行后面的指令, 直接返回, 可以指定返回值</td>
+</tr>
+<tr>
+<td><code>call printf(&quot;%s\n&quot;, str)</code></td>
+<td>调用 <code>printf</code> 函数, 打印字符串 (可以使用 <code>call</code> 或者 <code>print</code> 调用函数)</td>
+</tr>
+<tr>
+<td><code>print func()</code></td>
+<td>调用 <em>func</em> 函数 (可以使用 <code>call</code> 或者 <code>print</code> 调用函数)</td>
+</tr>
+<tr>
+<td><code>set var variable=xxx</code></td>
+<td>设置变量 <em>variable</em> 的值为 xxx</td>
+</tr>
+<tr>
+<td><code>set &#123;type&#125;address = xxx</code></td>
+<td>给存储地址为 <em>address</em> , 类型为 <em>type</em> 的变量赋值</td>
+</tr>
+<tr>
+<td><code>info frame</code></td>
+<td>显示函数堆栈的信息 (堆栈帧地址、指令寄存器的值等)</td>
+</tr>
+</tbody></table>
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%96%AD%E7%82%B9"><span class="top-box-text">断点</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#breakpoint"><span class="top-box-text">breakpoint</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#watchpoint"><span class="top-box-text">watchpoint</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#catchpoint"><span class="top-box-text">catchpoint</span></a></li></ol></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%91%BD%E4%BB%A4%E8%A1%8C"><span class="top-box-text">命令行</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E7%A8%8B%E5%BA%8F%E6%A0%88"><span class="top-box-text">程序栈</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%A4%9A%E8%BF%9B%E7%A8%8B%E3%80%81%E5%A4%9A%E7%BA%BF%E7%A8%8B"><span class="top-box-text">多进程、多线程</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E5%A4%9A%E8%BF%9B%E7%A8%8B"><span class="top-box-text">多进程</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E5%A4%9A%E7%BA%BF%E7%A8%8B"><span class="top-box-text">多线程</span></a></li></ol></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%89%93%E5%8D%B0%E8%BE%93%E5%87%BA"><span class="top-box-text">打印输出</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E6%89%93%E5%8D%B0%E5%AD%97%E7%AC%A6%E4%B8%B2"><span class="top-box-text">打印字符串</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E6%89%93%E5%8D%B0%E6%95%B0%E7%BB%84"><span class="top-box-text">打印数组</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E6%89%93%E5%8D%B0%E6%8C%87%E9%92%88"><span class="top-box-text">打印指针</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E6%89%93%E5%8D%B0%E6%8C%87%E5%AE%9A%E5%86%85%E5%AD%98%E5%9C%B0%E5%9D%80%E7%9A%84%E5%80%BC"><span class="top-box-text">打印指定内存地址的值</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E6%89%93%E5%8D%B0%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F"><span class="top-box-text">打印局部变量</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E6%89%93%E5%8D%B0%E7%BB%93%E6%9E%84%E4%BD%93"><span class="top-box-text">打印结构体</span></a></li></ol></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%87%BD%E6%95%B0%E8%B7%B3%E8%BD%AC"><span class="top-box-text">函数跳转</span></a></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+  </div>
+
+
+
+
+
+
+
+
+
+
+<footer>
+<div class="site-footer">
+  <div class="social-container">
+    
+      
+        <a aria-label="跳转至github" href="https://github.com/f-dong" target="_blank">
+          <i class="icon icon-github"></i>
+        </a>
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+  </div>
+  
+    Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+  
+  
+  
+  
+  
+  
+</div>
+</footer>
+
+
+      </div>
+    </div>
+    
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+  </body>
+</html>
+
