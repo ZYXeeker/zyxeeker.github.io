@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>嵌入式下多应用架构</title>
+<meta name="keywords" content="嵌入式下多应用架构, ZYXeeker`s blog">
+<meta name="description" content="单体应用时间带来的变化在早期的业务中嵌入式应用中只需要简单的对设备上的硬件资源进行整合和调用，并将需要的数据传递给上层设备交予其中的应用进行解析和应用，所以当时的结构及其简单：
+flowchart TB
+    subgraph Devic">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="嵌入式下多应用架构">
+<meta property="og:description" content="单体应用时间带来的变化在早期的业务中嵌入式应用中只需要简单的对设备上的硬件资源进行整合和调用，并将需要的数据传递给上层设备交予其中的应用进行解析和应用，所以当时的结构及其简单：
+flowchart TB
+    subgraph Devic">
+
+
+<script src="/js/mermaid.min.js"></script>
+
+<script>
+  $(document).ready(function() {
+      var mermaid_config = {
+          startOnLoad: true,
+          theme: 'default',
+          flowchart:{
+              useMaxWidth: false,
+              htmlLabels: true
+          }                
+      }
+      mermaid.initialize(mermaid_config);
+  });
+</script>
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://www.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://www.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">嵌入式下多应用架构</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-16</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/ARM-Arch-Linux/">
+              ARM, Arch, Linux
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <h1 id="单体应用"><a href="#单体应用" class="headerlink" title="单体应用"></a>单体应用</h1><h2 id="时间带来的变化"><a href="#时间带来的变化" class="headerlink" title="时间带来的变化"></a>时间带来的变化</h2><p>在早期的业务中嵌入式应用中只需要简单的对设备上的硬件资源进行整合和调用，并将需要的数据传递给上层设备交予其中的应用进行解析和应用，所以当时的结构及其简单：</p>
+<pre class="mermaid">flowchart TB
+    subgraph Device
+        direction TB
+        app(((App\n业务逻辑实现)))
+        subgraph HW
+            direction BT
+            cam(Camera)
+            i2c(I2C)
+            hdmi(HDMI)
+            audio(Audio)
+            hw_more(...)
+        end
+    end
+    top_device([上层设备])
+    top_device <--通过协议传输数据/指令--> app
+    app <--实现对硬件的调用--> HW
+    style HW fill:#4d547a</pre>
+<p>但随着业务的需求变化，从当初的简单业务逻辑变成了更复杂更完备的单独设备，并且随着项目基线的多次迭代和不同产品的使用导致了所有业务集中在了一个单独的应用（只列出部分业务逻辑）中：</p>
+<pre class="mermaid">flowchart BT
+    subgraph Device
+        direction RL
+        app(((App\n业务逻辑实现)))
+        subgraph System
+            direction BT
+            monitor(系统监控)
+            net(网络服务)
+            date(系统时间)
+            sys_more(...)
+        end
+        subgraph HW
+        end
+        HW <--实现对硬件的调用--> app
+        System <--系统管理--> app
+    end
+    subgraph Protocol
+        direction BT
+        http([HTTP])
+        hid([HID])
+        mqtt([MQTT])
+        out_more([...])
+    end
+    style Protocol fill:#726747
+    style HW fill:#4d547a
+    style System fill:#594b6d
+    web([Web])
+    report([设备上报])
+    detected([设备发现])
+    log([日志管理])
+    fs([文件上传/下载])
+    app <--> fs
+    app <--> detected
+    app <--> report
+    app <--> log
+    app <--通过协议对外交互---> Protocol
+    app --提供UI交互--> web
+    http <--> web</pre>
+<h2 id="所带来的问题"><a href="#所带来的问题" class="headerlink" title="所带来的问题"></a>所带来的问题</h2><p>由于所有的服务集中在单体应用中，这就导致了模块对应的开发人员在开发时如果没有对异常进行妥善处理，有可能导致整个应用崩溃，致使不该受到影响的关键服务也受到牵连：</p>
+<ul>
+<li><strong>HTTP 和 Web 服务器</strong>：在有网络需求的情况下，大概率会对 HTTP 和 Web 有需求，而且 Web 往往会对接设备的 HTTP 接口，在集中在单体应用上时，出现应用崩溃会导致原本的 Web 和 HTTP 接口均无法正常使用，特别是在有提供 HTTP 接口对设备进行软重启的需求下，对不在现场的设备出现这样的情况只能派人员进行现场&#x2F;远程处理</li>
+<li><strong>设备发现服务</strong>：一般联网的嵌入式设备都会有该相关的需求，比如网络摄像机（IPC）设备，设备被探测到一般会回应自身的网络和设备信息，所以在单体应用出现崩溃时，也需要能够做出回应给探测主机</li>
+<li><strong>日志管理</strong>：在设备出现故障时需要能够对日志进行取回，这是最关键的服务，重要性就不用多说了</li>
+<li><strong>文件上传&#x2F;下载</strong>：在有网络的情况下，可以通过 TFTP，FTP 等服务将进程生成的 coredump 进行取回，同时在日志管理等其他基础服务故障时也可以取回日志等相关的文件来确定崩溃位置</li>
+<li><strong>升级服务</strong>：对于嵌入式设备升级来说，不应该受到其他服务的干扰，如果其他服务出现异常就有可能导致升级异常终止，或者设备变砖<br>将服务集中在单体应用中来说，确实便于开发，同时减少服务之间的交互响应时间，但同时不可避免的带来一个服务全挂导致整个应用崩溃的问题，甚至也可能导致服务模块之间出现耦合<br><strong>如何改进和处理？</strong><br>将基础关键的服务进行分离做为单独的应用<br><strong>如何做到合理的分离？</strong><br>遵循一个很简单的原则就行：<em>将共用一块资源以及相同功能目的的服务划分至一起</em></li>
+</ul>
+<h1 id="多应用"><a href="#多应用" class="headerlink" title="多应用"></a>多应用</h1><h2 id="拆撒单体应用"><a href="#拆撒单体应用" class="headerlink" title="拆撒单体应用"></a>拆撒单体应用</h2><p>既然需要分离进程同时也需要通过 HTTP 对进程进行交互，那么需要做三件事：</p>
+<ol>
+<li><strong>构建 IPC 中间件用于进程间通信</strong>：IPC 中间件主要是作为一个组件引用到不同的应用中进行业务处理，主要的传递的是 <strong>指令 + 数据</strong>，当服务&#x2F;模块遇到需要处理的指令时，对带入的数据进行解析，并返回对应的结果</li>
+<li><strong>构建一个统一的 HTTP 接口服务器</strong>：在我们对单一应用中的模块和服务进行了分离后，这就导致了每个应用需要实现一个 HTTP 服务器来对接原有的交互接口，对于开发来说不仅要关注业务实现，同时还要关注 HTTP 的接口编写和数据处理，由于这些接口是会进行对外交互，所以有时候会需要按客户的要求进行定义和修改，这样反而带来了不必要的麻烦</li>
+<li><strong>恰当的分离服务至同一应用中</strong></li>
+</ol>
+<blockquote>
+<p>如果存在对数据编解码传递的情况下，可以在 HTTP 那对传进来的数据进行解析转换，这样可以提前判断并返回异常，比如 ProtoBuf 最新版本就可以做到 Json 转换，当键值不存在时就可以直接返回异常原因</p>
+</blockquote>
+<p>由于我这边的业务需求其实相当于将设备作为一个小型的服务端，所以我引入了 Nginx 用于代理 HTTP 服务器和处理 Web 静态资源以及其他业务处理：</p>
+<pre class="mermaid">flowchart BT
+    out[\外界交互/通信\]
+    subgraph Device
+        direction BT
+        nginx(Nginx)
+        app(((App\n主业务逻辑模块)))
+        device(((Device\n设备基础服务)))
+        api(((HTTP Server\nHTTP服务器)))
+        logger(((Logger\n日志记录服务)))
+        discovery(((Discovery\n设备发现服务)))
+        web[Web]
+        subgraph System
+        end
+        subgraph HW
+        end
+        api <--代理--> nginx
+        web <--静态资源访问--> nginx
+        app <--其他业务交互--> nginx
+        discovery <--IPC---> api
+        device <--IPC---> api
+        logger <--IPC---> api
+        app <--IPC---> api
+        HW <--实现对硬件的调用--> app
+        System <--系统管理--> device
+    end
+    app <--通过协议对外交互-----> out
+    discovery <--通过协议对外交互-----> out
+    nginx <--> out
+    style HW fill:#4d547a
+    style System fill:#594b6d</pre>
+<p>在改进过后 HTTP Server 相当于 在 IPC 层承担了服务端，其他的应用作为 IPC 客户端进行数据交互</p>
+<h2 id="后续出现的问题"><a href="#后续出现的问题" class="headerlink" title="后续出现的问题"></a>后续出现的问题</h2><p>在后续的开发中，我在设备发现服务这块发现了一些问题：</p>
+<ul>
+<li>需要的设备信息在出厂后会发生修改，而设备信息相关的服务已经迁移至设备基础服务中，并且负责这块的同事是通过直接读取相关文件来取得的设备信息，这就会导致了两者会出现缓存不一致的情况</li>
+<li>存在修改设备网络配置的指令，同样网络服务也迁移到了设备基础服务中，这就导致了负责网络服务的同事需要判断发现服务配置文件中修改的标志位来同步修改网络配置</li>
+<li>其中的某些服务需要从主业务应用获取相关数据等等<br>实际上设备发现服务也和 HTTP Server 一样作为了服务端，但是 HTTP Server 也会从设备发现服务中去取得相关的数据。这就相当于它是其他应用的服务端，但对于 HTTP Server 来说它是客户端，所以应用间的整体链路就变成了这样：<pre class="mermaid">flowchart BT
+    subgraph Device
+        direction BT
+        app(((App\n主业务逻辑模块)))
+        device(((Device\n设备基础服务)))
+        api(((HTTP Server\nHTTP服务器)))
+        logger(((Logger\n日志记录服务)))
+        discovery(((Discovery\n设备发现服务)))
+        logger <--IPC---> api
+        device <--IPC--> api
+        app <--IPC--> api
+        discovery <--IPC--> api
+        device <--IPC--> discovery
+        app <--IPC--> discovery
+    end</pre>
+所以实际上缺乏一个多个应用间可相互通信的机制，我们应当增加对多个服务端的管理和访问，但对于使用者来说，设备基础服务应用和主业务应用需要知道 HTTP Server 和设备发现服务应用的 IPC 服务器地址，假设后续出现多个服务端那么但凡需要交互的应用需要管理多个地址，然后进行区分发送，这样反而变得更加麻烦。</li>
+</ul>
+<h2 id="如何解决？"><a href="#如何解决？" class="headerlink" title="如何解决？"></a>如何解决？</h2><p>那么我们其实可以构建一个 <strong>IPC 转发中枢</strong>，<em>它将接收到的数据广播给所有已连接上的应用，那么所有的应用只需要和它建立连接，就可以处理所有应用发来的数据</em>：</p>
+<pre class="mermaid">flowchart BT
+    subgraph Device
+        direction TB
+        app(((App\n主业务逻辑模块)))
+        device(((Device\n设备基础服务)))
+        api(((HTTP Server\nHTTP服务器)))
+        logger(((Logger\n日志记录服务)))
+        discovery(((Discovery\n设备发现服务)))
+        forwarder(((IPC中枢\n数据转发中枢)))
+
+        api <--IPC--> forwarder
+        discovery <--IPC--> forwarder
+        forwarder <--IPC--> app
+        forwarder <--IPC--> device
+        forwarder <--IPC--> logger
+    end</pre>
+<p>这样所有的应用即可相互通信，在多个应用中保证缓存一致性</p>
+<h2 id="更进一步？"><a href="#更进一步？" class="headerlink" title="更进一步？"></a>更进一步？</h2><p>当然采用构建消息转发中枢这样的方式并不是最好的解决方案，因为对于应用来说，传递的数据需要经过转发并不能直接点对点的送达，这样数据传递的延迟会有所增加<br>所以可以考虑将中枢转换成应用服务注册主机，当应用上线时，将自身的相关信息自动注册至主机，注册上的同时可以获取到其他已注册者的相关信息，其中就可以包含其他应用服务的节点信息，这样就可以直接点对点的传递数据，从而不再需要经过转发：</p>
+<pre class="mermaid">flowchart TB
+    app_1(((业务/服务应用\n#1)))
+    app_2(((业务/服务应用\n#2)))
+    host(((应用服务主机)))
+    app_1-- 注册自身信息 -->host
+    host-- 返回其他节点信息 -->app_1
+    app_1 <--IPC--> app_2
+    app_2-- 注册自身信息 -->host
+    host-- 返回其他节点信息 -->app_2</pre>
+<p>服务主机当然可以不限于应用的注册，还可以增加其他功能，比如已注册应用进程的守护等等</p>
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%8D%95%E4%BD%93%E5%BA%94%E7%94%A8"><span class="top-box-text">单体应用</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%97%B6%E9%97%B4%E5%B8%A6%E6%9D%A5%E7%9A%84%E5%8F%98%E5%8C%96"><span class="top-box-text">时间带来的变化</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%89%80%E5%B8%A6%E6%9D%A5%E7%9A%84%E9%97%AE%E9%A2%98"><span class="top-box-text">所带来的问题</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%A4%9A%E5%BA%94%E7%94%A8"><span class="top-box-text">多应用</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%8B%86%E6%92%92%E5%8D%95%E4%BD%93%E5%BA%94%E7%94%A8"><span class="top-box-text">拆撒单体应用</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%90%8E%E7%BB%AD%E5%87%BA%E7%8E%B0%E7%9A%84%E9%97%AE%E9%A2%98"><span class="top-box-text">后续出现的问题</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3%EF%BC%9F"><span class="top-box-text">如何解决？</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%9B%B4%E8%BF%9B%E4%B8%80%E6%AD%A5%EF%BC%9F"><span class="top-box-text">更进一步？</span></a></li></ol></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2022/01/05/gdb/">
+          <h3 class="post-title">
+            下一篇：GDB常用命令
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+
+
+
+
+
+
+
+
+<footer>
+<div class="site-footer">
+  <div class="social-container">
+    
+      
+        <a aria-label="跳转至github" href="https://github.com/f-dong" target="_blank">
+          <i class="icon icon-github"></i>
+        </a>
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+  </div>
+  
+    Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+  
+  
+  
+  
+  
+  
+</div>
+<script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({theme: 'dark'});
+  }
+</script>
+</footer>
+
+
+      </div>
+    </div>
+    
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+  </body>
+</html>
+

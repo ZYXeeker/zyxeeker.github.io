@@ -9,15 +9,31 @@
 
 <meta charset="utf-8" >
 
-<title>Hexo</title>
-<meta name="keywords" content="Hexo, Hexo">
-<meta name="description" content="Hexo">
+<title>ZYXeeker`s blog</title>
+<meta name="keywords" content="ZYXeeker`s blog, ZYXeeker`s blog">
+<meta name="description" content="ZYXeeker`s blog">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta property="og:title" content="Hexo">
-<meta property="og:description" content="Hexo">
+<meta property="og:title" content="ZYXeeker`s blog">
+<meta property="og:description" content="ZYXeeker`s blog">
 
+
+<script src="/js/mermaid.min.js"></script>
+
+<script>
+  $(document).ready(function() {
+      var mermaid_config = {
+          startOnLoad: true,
+          theme: 'default',
+          flowchart:{
+              useMaxWidth: false,
+              htmlLabels: true
+          }                
+      }
+      mermaid.initialize(mermaid_config);
+  });
+</script>
 <link rel="shortcut icon" href="/favicon.ico">
 <link rel="stylesheet" href="/style/main.css">
 
@@ -28,11 +44,11 @@
 <div class="site-header-container">
   <div class="site-header">
     <div class="left">
-      <a href="http://example.com">
+      <a href="https://www.zyxeeker.top">
         <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
       </a>
-      <a href="http://example.com">
-        <h1 class="site-title">Hexo</h1>
+      <a href="https://www.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
       </a>
     </div>
     <div class="right">
@@ -77,7 +93,7 @@
 
   <div class="current-tag-container">
     <h2 class="title">
-      <i class="icon icon-pricetags-outline"></i> c++
+      <i class="icon icon-pricetags-outline"></i> C++
     </h2>
   </div>
 
@@ -85,29 +101,25 @@
 
 <section class="post-item">
     <div class="content">
-      <a href="/2024/04/02/logger_3/">
-        <h2 class="post-title">日志器（三）等级</h2>
+      <a href="/2024/05/24/cfg-cvt/">
+        <h2 class="post-title">C++中配置转换设计</h2>
       </a>
-      <a href="/2024/04/02/logger_3/">
+      <a href="/2024/05/24/cfg-cvt/">
           <div class="post-abstract">
             
-			    在使用日志时，我们需要对不同的情况进行输出，因此可以大致分为不同的等级：
-
-DEBUG：Debug调试信息
-INFO：普通信息输出提示
-WARN：超出接口&#x2F;业务逻辑处理范围或者不兼容时提示
-ERROR：接口&#x2F;业务逻辑处理
+			    问题？在使用 JsonCpp 相关的库对配置数据进行读写时，有可能会出现这样的问题，首先写入数据到文件：
+// 写入数据uint32_t width  = 1920;uint32_t height = 1080;uint32_t fps  
             
           </div>
       </a>
       <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-04-02</span>
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-24</span>
         
           <span>
             <i class="icon icon-pricetags-outline"></i>
             
 
-                c++
+                C++
                 
             
           </span>
@@ -120,57 +132,27 @@ ERROR：接口&#x2F;业务逻辑处理
 
 <section class="post-item">
     <div class="content">
-      <a href="/2024/04/01/logger_2/">
-        <h2 class="post-title">日志器（二）文件名, 函数名, 行号</h2>
+      <a href="/2024/05/24/cfg-observer/">
+        <h2 class="post-title">C++中配置监听设计</h2>
       </a>
-      <a href="/2024/04/01/logger_2/">
+      <a href="/2024/05/24/cfg-observer/">
           <div class="post-abstract">
             
-			    在调用日志输出的时候，我们希望在输出的时候可以同时输出被调用处的文件名，函数名，行号甚至是线程名&#x2F;ID
-修改接口所以可以在构造函数处添加 const char* file, const char* function, uint64
+			    
+本文是对上篇文章（C++中配置转换设计）的运用前置知识：模板，完美转发，智能指针，设计模式-监听模式
+
+场景运用在项目中有时需要对一些配置变量发生改动时进行回调监听，不仅发生在被其他调用者修改的场景，也可能存在对应的配置管理器需要监听文件
             
           </div>
       </a>
       <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-04-01</span>
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-24</span>
         
           <span>
             <i class="icon icon-pricetags-outline"></i>
             
 
-                c++
-                
-            
-          </span>
-        
-      </div>
-    </div>
-  </section>
-
-
-
-<section class="post-item">
-    <div class="content">
-      <a href="/2024/03/29/logger_1/">
-        <h2 class="post-title">日志器（一）基础功能</h2>
-      </a>
-      <a href="/2024/03/29/logger_1/">
-          <div class="post-abstract">
-            
-			    对于以往常用的输出调用方式来说，我们希望可以像 printf 那样可以指定输出格式，同时也可以像 cout 那样使用 &lt;&lt; 来进行方便快捷的输出
-接口设计所以可以大致设计如下接口：
-class Logger &#123; pub
-            
-          </div>
-      </a>
-      <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-03-29</span>
-        
-          <span>
-            <i class="icon icon-pricetags-outline"></i>
-            
-
-                c++
+                C++
                 
             
           </span>
@@ -214,6 +196,12 @@ class Logger &#123; pub
   
   
 </div>
+<script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({theme: 'dark'});
+  }
+</script>
 </footer>
 
 

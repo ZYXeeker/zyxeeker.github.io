@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>C++中配置转换设计</title>
+<meta name="keywords" content="C++中配置转换设计, ZYXeeker`s blog">
+<meta name="description" content="问题？在使用 JsonCpp 相关的库对配置数据进行读写时，有可能会出现这样的问题，首先写入数据到文件：
+// 写入数据uint32_t width  = 1920;uint32_t height = 1080;uint32_t fps  ">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="C++中配置转换设计">
+<meta property="og:description" content="问题？在使用 JsonCpp 相关的库对配置数据进行读写时，有可能会出现这样的问题，首先写入数据到文件：
+// 写入数据uint32_t width  = 1920;uint32_t height = 1080;uint32_t fps  ">
+
+
+<script src="/js/mermaid.min.js"></script>
+
+<script>
+  $(document).ready(function() {
+      var mermaid_config = {
+          startOnLoad: true,
+          theme: 'default',
+          flowchart:{
+              useMaxWidth: false,
+              htmlLabels: true
+          }                
+      }
+      mermaid.initialize(mermaid_config);
+  });
+</script>
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://www.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://www.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">C++中配置转换设计</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-24</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/C/">
+              C++
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <h1 id="问题？"><a href="#问题？" class="headerlink" title="问题？"></a>问题？</h1><p>在使用 <em>JsonCpp</em> 相关的库对配置数据进行读写时，有可能会出现这样的问题，首先写入数据到文件：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 写入数据</span></span><br><span class="line"><span class="type">uint32_t</span> width  = <span class="number">1920</span>;</span><br><span class="line"><span class="type">uint32_t</span> height = <span class="number">1080</span>;</span><br><span class="line"><span class="type">uint32_t</span> fps    = <span class="number">25</span>;</span><br><span class="line"></span><br><span class="line">Json::Value value;</span><br><span class="line">value[<span class="string">&quot;width&quot;</span>]  = width;</span><br><span class="line">value[<span class="string">&quot;height&quot;</span>] = height;</span><br><span class="line">value[<span class="string">&quot;fps&quot;</span>]    = fps;</span><br><span class="line"></span><br><span class="line">... <span class="comment">// 写入到文件</span></span><br></pre></td></tr></table></figure>
+<p>然后创建一个一模一样的变量来和文件中读取出来的数据做比对：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 从文件中读取的变量</span></span><br><span class="line">Json::Value value_from_file;</span><br><span class="line">... <span class="comment">// 读取文件</span></span><br><span class="line"></span><br><span class="line"><span class="type">uint32_t</span> width  = <span class="number">1920</span>;</span><br><span class="line"><span class="type">uint32_t</span> height = <span class="number">1080</span>;</span><br><span class="line"><span class="type">uint32_t</span> fps    = <span class="number">25</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 创建一个相同kv变量</span></span><br><span class="line">Json::Value value;</span><br><span class="line">value[<span class="string">&quot;width&quot;</span>]  = width;</span><br><span class="line">value[<span class="string">&quot;height&quot;</span>] = height;</span><br><span class="line">value[<span class="string">&quot;fps&quot;</span>]    = fps;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 两者进行比对</span></span><br><span class="line"><span class="keyword">if</span> (value == value_from_file) &#123;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;equal!\n&quot;</span>);</span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;not equal!\n&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>然后在输出的时候你会发现，这两个变量其实是不等的，那么为什么 <em>kv</em>  一致的情况下判断出来却不相等呢？<br>查询 <em>JsonCpp</em> <a target="_blank" rel="noopener" href="https://github.com/open-source-parsers/jsoncpp/blob/master/include/json/value.h#L108">源码</a>后可知晓：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="comment">/** \brief Type of the value held by a Value object.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">enum</span> <span class="title class_">ValueType</span> &#123;</span><br><span class="line">  nullValue = <span class="number">0</span>, <span class="comment">///&lt; &#x27;null&#x27; value</span></span><br><span class="line">  intValue,      <span class="comment">///&lt; signed integer value</span></span><br><span class="line">  uintValue,     <span class="comment">///&lt; unsigned integer value</span></span><br><span class="line">  realValue,     <span class="comment">///&lt; double value</span></span><br><span class="line">  stringValue,   <span class="comment">///&lt; UTF-8 string value</span></span><br><span class="line">  booleanValue,  <span class="comment">///&lt; bool value</span></span><br><span class="line">  arrayValue,    <span class="comment">///&lt; array value (ordered list)</span></span><br><span class="line">  objectValue    <span class="comment">///&lt; object value (collection of name/value pairs).</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p><em>JsonCpp</em> 中对整型数据进行了细分，然而 Json 并没有特殊的规范针对文件中的整型进行有无符号的区分，所以 <em>JsonCpp</em> 读取到的整型均以有符号的方式来读取，这就导致了上面的问题，即 <em>kv</em>  虽然相等了，但是 <em>v</em>  的类型不相等<br>这个情况同时也导致了某些实现监听配置变动时，在回调中对新老值的比对上出现问题：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">XX::OnCfgChanged</span><span class="params">(<span class="type">const</span> listener_id id, <span class="type">const</span> Json::Value&amp; old_value, <span class="type">const</span> Json::Value&amp; new_value)</span> </span>&#123;</span><br><span class="line">	...</span><br><span class="line">	<span class="comment">// 导致不应该的业务逻辑被触发</span></span><br><span class="line">	<span class="keyword">if</span> (old_value[<span class="string">&quot;resolution&quot;</span>] != new_value[<span class="string">&quot;resolution&quot;</span>]) &#123;</span><br><span class="line">		...</span><br><span class="line">	&#125;</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>如只需要简单的使用，那么不需要在意很多，但对于复杂的项目来说就应该尽量避免这样实现</p>
+<h1 id="如何更好的设计？"><a href="#如何更好的设计？" class="headerlink" title="如何更好的设计？"></a>如何更好的设计？</h1><p>其实可以将配置视为一个对象来进行设计，以对象来管理资源一直是 C++ 的处理方式，这样就可以定义好 <code>value</code> 的类型：</p>
+<div style="display: flex;justify-content : center;align-items: center;">
+<div>
+<figure class="highlight json"><table><tr><td class="code"><pre><span class="line"><span class="attr">&quot;obj&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">	<span class="attr">&quot;text&quot;</span><span class="punctuation">:</span> <span class="string">&quot;_text_&quot;</span><span class="punctuation">,</span></span><br><span class="line">	<span class="attr">&quot;num&quot;</span><span class="punctuation">:</span> <span class="number">1</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+</div>
+<div>
+➡
+</div>
+<div>
+<figure class="highlight json"><table><tr><td class="code"><pre><span class="line">struct Obj <span class="punctuation">&#123;</span></span><br><span class="line">  std<span class="punctuation">:</span><span class="punctuation">:</span>string text;</span><br><span class="line">  int32_t num;</span><br><span class="line"><span class="punctuation">&#125;</span>;</span><br></pre></td></tr></table></figure>
+</div>
+</div>
+
+<p>这样既可以确认对应配置所具有的 <em>kv</em>  也可以保证类型安全。当然我们的目的是将 Json 与目标值进行转换，所以可以基于 Json 库来定义接口来编写，这里使用 <em>nlohmann</em> 库来做为 Json 的转换：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="keyword">namespace</span> tools &#123;</span><br><span class="line"><span class="keyword">namespace</span> var &#123;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;</span><br><span class="line"> <span class="keyword">public</span>:</span><br><span class="line">  <span class="keyword">virtual</span> ~<span class="built_in">Base</span>() = <span class="keyword">default</span>;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * @brief 解释Json对象</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">FromJson</span><span class="params">(<span class="type">const</span> nlohmann::json&amp; json)</span> </span>= <span class="number">0</span>;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * @brief 转换为Json对象</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="keyword">virtual</span> nlohmann::json <span class="title">ToJson</span><span class="params">()</span> </span>= <span class="number">0</span>;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * @brief 序列化, 调用ToJson进行转换, 再通过库函数转换为字符串</span></span><br><span class="line"><span class="comment">   * @return 返回Json字符串</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="keyword">virtual</span> std::string <span class="title">ToJsonString</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> nlohmann::<span class="built_in">to_string</span>(<span class="built_in">ToJson</span>());</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * @brief 反序列化, 调用库进行解析, 再通过调用FromJson进行转换</span></span><br><span class="line"><span class="comment">   * @param json_str Json字符串</span></span><br><span class="line"><span class="comment">   * @throw 解析失败抛出nlohmann::json::parse_error</span></span><br><span class="line"><span class="comment">   * @return 返回是否成功反序列化</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">FromJsonString</span><span class="params">(<span class="type">const</span> std::string&amp; json_str)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">FromJson</span>(nlohmann::json::<span class="built_in">parse</span>(json_str));</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">&#125; <span class="comment">// var</span></span><br><span class="line">&#125; <span class="comment">// tools</span></span><br></pre></td></tr></table></figure>
+<p>那么 <code>Obj</code> 就可以继承 <code>tools::var::Base</code> 进行实现：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> tools;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 继承VarBase进行实现</span></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Obj</span> : <span class="keyword">public</span> var::Base &#123;</span><br><span class="line">  std::string text;</span><br><span class="line">  <span class="type">int32_t</span> num&#123;&#125;;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">FromJson</span><span class="params">(<span class="type">const</span> nlohmann::json&amp; json)</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 目标值, 键值, 不存在时的默认值</span></span><br><span class="line">    <span class="type">const</span> <span class="keyword">auto</span> cvt = [&amp;](<span class="keyword">auto</span>&amp; dst, <span class="type">const</span> <span class="type">char</span>* key, <span class="keyword">auto</span> def_value) &#123;</span><br><span class="line">      dst = json.<span class="built_in">contains</span>(key) ? json[key].get&lt;std::<span class="type">remove_reference_t</span>&lt;<span class="keyword">decltype</span>(dst)&gt; &gt;() : def_value;</span><br><span class="line">    &#125;;</span><br><span class="line">    <span class="built_in">cvt</span>(text, <span class="string">&quot;text&quot;</span>, <span class="string">&quot;(null)&quot;</span>);</span><br><span class="line">    <span class="built_in">cvt</span>(num, <span class="string">&quot;num&quot;</span>, <span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="function">nlohmann::json <span class="title">ToJson</span><span class="params">()</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">    nlohmann::json json;</span><br><span class="line">    json[<span class="string">&quot;text&quot;</span>] = text;</span><br><span class="line">    json[<span class="string">&quot;num&quot;</span>] = num;</span><br><span class="line">    <span class="keyword">return</span> json;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>这样对于调用者来说就无需关注如何使用 Json 库转换出自己想要的数据，同时也可以在转换的函数里对数据进行对应的数据解析转换成对应的目标成员值</p>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><p>其实无论是 Json 还是 Yaml 或者 ini 等其他配置格式都可以考虑这样的实现方式，毕竟这样在大型的项目中是十分有利于其他模块的对接和处理，同时也可以减少代码互相耦合的情况</p>
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E9%97%AE%E9%A2%98%EF%BC%9F"><span class="top-box-text">问题？</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%A6%82%E4%BD%95%E6%9B%B4%E5%A5%BD%E7%9A%84%E8%AE%BE%E8%AE%A1%EF%BC%9F"><span class="top-box-text">如何更好的设计？</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%80%BB%E7%BB%93"><span class="top-box-text">总结</span></a></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2024/05/24/cfg-observer/">
+          <h3 class="post-title">
+            下一篇：C++中配置监听设计
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+
+
+
+
+
+
+
+
+<footer>
+<div class="site-footer">
+  <div class="social-container">
+    
+      
+        <a aria-label="跳转至github" href="https://github.com/f-dong" target="_blank">
+          <i class="icon icon-github"></i>
+        </a>
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+  </div>
+  
+    Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+  
+  
+  
+  
+  
+  
+</div>
+<script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({theme: 'dark'});
+  }
+</script>
+</footer>
+
+
+      </div>
+    </div>
+    
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+  </body>
+</html>
+

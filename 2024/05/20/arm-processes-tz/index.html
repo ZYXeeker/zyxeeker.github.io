@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>Arm下多进程时区问题</title>
+<meta name="keywords" content="Arm下多进程时区问题, ZYXeeker`s blog">
+<meta name="description" content="
+版本依据Glibc-2.33, Kernel-5.10.117
+
+对于不需要时间同步的情况来说，在程序运行前 env 中设置好 TZ 的相关参数即可，这里主要记录存在 NTP 服务情况下的处理方式
+问题？在多进程下，NTP 由另一个应用的">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="Arm下多进程时区问题">
+<meta property="og:description" content="
+版本依据Glibc-2.33, Kernel-5.10.117
+
+对于不需要时间同步的情况来说，在程序运行前 env 中设置好 TZ 的相关参数即可，这里主要记录存在 NTP 服务情况下的处理方式
+问题？在多进程下，NTP 由另一个应用的">
+
+
+<script src="/js/mermaid.min.js"></script>
+
+<script>
+  $(document).ready(function() {
+      var mermaid_config = {
+          startOnLoad: true,
+          theme: 'default',
+          flowchart:{
+              useMaxWidth: false,
+              htmlLabels: true
+          }                
+      }
+      mermaid.initialize(mermaid_config);
+  });
+</script>
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://www.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://www.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">Arm下多进程时区问题</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-20</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/ARM-Kernel-Glibc-Linux/">
+              ARM, Kernel, Glibc, Linux
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <blockquote>
+<p>版本依据<br><em>Glibc-2.33</em>, <em>Kernel-5.10.117</em></p>
+</blockquote>
+<p>对于不需要时间同步的情况来说，在程序运行前 <em>env</em> 中设置好 <code>TZ</code> 的相关参数即可，这里主要记录存在 NTP 服务情况下的处理方式</p>
+<h1 id="问题？"><a href="#问题？" class="headerlink" title="问题？"></a>问题？</h1><p>在多进程下，NTP 由另一个应用的时间服务进行托管调用，经过多次调用后发现，只有托管的应用的时间处于正常的时区，其他的时间虽然进行了同步但是时区未同步，后来查询源码后发现，<a target="_blank" rel="noopener" href="https://github.com/bminor/glibc/blob/glibc-2.33/stdlib/setenv.c#L251"><code>setenv()</code>⚡</a> 和 <a target="_blank" rel="noopener" href="https://github.com/bminor/glibc/blob/glibc-2.33/stdlib/putenv.c#L52"><code>puttenv()</code>⚡</a> 两个函数在 <em>glibc</em> 中实际上调用的是 <a target="_blank" rel="noopener" href="https://github.com/bminor/glibc/blob/glibc-2.33/stdlib/setenv.c#L116"><code>__add_to_environ()</code>⚡</a> ，而这个函数是对应用空间中的全局变量 <code>char **environ</code> 进行操作，实际上并没有将时区相关的参数传递给内核：</p>
+<pre class="mermaid">flowchart TB
+    f_putenv("putenv()")
+    f_setenv("setenv()")
+    f_add_to_environ("__add_to_environ()")
+    environ("char** environ")
+    f_putenv --> f_add_to_environ
+    f_setenv --> f_add_to_environ
+    f_add_to_environ --> environ</pre>
+<p>所以无论怎么修改，都不会影响到其他程序的时区</p>
+<h1 id="尝试解决"><a href="#尝试解决" class="headerlink" title="尝试解决"></a>尝试解决</h1><p>那应该如何让其他程序时区发生改变呢？后来翻了下 Ubuntu 的 <em>timedate</em> 设置时区 <a target="_blank" rel="noopener" href="https://github.com/systemd/systemd/blob/main/src/timedate/timedated.c#L665"><code>method_set_timezone()</code>⚡</a> 的源码，发现大致的流程如下：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="type">static</span> <span class="type">int</span> <span class="title">method_set_timezone</span><span class="params">(sd_bus_message *m, <span class="type">void</span> *userdata, sd_bus_error *error)</span> </span>&#123;</span><br><span class="line">		... <span class="comment">// 修改自身配置</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 1. Write new configuration file */</span></span><br><span class="line">        r = <span class="built_in">context_write_data_timezone</span>(c);</span><br><span class="line">        ....</span><br><span class="line">        <span class="comment">/* 2. Make glibc notice the new timezone */</span></span><br><span class="line">        <span class="built_in">tzset</span>();</span><br><span class="line">        <span class="comment">/* 3. Tell the kernel our timezone */</span></span><br><span class="line">        r = <span class="built_in">clock_set_timezone</span>(<span class="literal">NULL</span>);</span><br><span class="line">        </span><br><span class="line">        ... <span class="comment">// 按需同步RTC, 触发事件通知并返回</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>第一步的 <a target="_blank" rel="noopener" href="https://github.com/systemd/systemd/blob/main/src/timedate/timedated.c#L294"><code>context_write_data_timezone()</code>⚡</a> 是在 <code>/usr/share/zoneinfo/UTC</code> 下选择对应的时区文件创建对应的软链接到 <code>/etc/localtime</code> ，然后通过 <code>tzset()</code> 同步自身应用的时区，最后通过<a target="_blank" rel="noopener" href="https://github.com/systemd/systemd/blob/main/src/shared/clock-util.c#L97"><code>clock_set_timezone()</code>⚡</a> 中调用 <code>settimeofday()</code> 来同步给内核时区：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">clock_set_timezone</span><span class="params">(<span class="type">int</span> *ret_minutesdelta)</span> </span>&#123;</span><br><span class="line">		...</span><br><span class="line">        <span class="comment">/* If the RTC does not run in UTC but in local time, the very first call to settimeofday() will set</span></span><br><span class="line"><span class="comment">         * the kernel&#x27;s timezone and will warp the system clock, so that it runs in UTC instead of the local</span></span><br><span class="line"><span class="comment">         * time we have read from the RTC. */</span></span><br><span class="line">        <span class="keyword">if</span> (<span class="built_in">settimeofday</span>(<span class="literal">NULL</span>, &amp;tz) &lt; <span class="number">0</span>)</span><br><span class="line">                <span class="keyword">return</span> -errno;</span><br><span class="line">		...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>然而移植这段代码后发现，其他进程并没有同步时区，然后我使用 <code>gettimeofday()</code> 拿到 <code>timezone</code> 中的 <code>tz_minuteswest</code>  进行比对发现，无论是自身设置过的应用还是其他应用均返回为 0，说明并没有设置成功，但设置却未返回异常。随后我看了下 <em>glibc</em> 中的实现，发现 <code>gettimeofday()</code> 的实际<a target="_blank" rel="noopener" href="https://github.com/bminor/glibc/blob/glibc-2.33/sysdeps/unix/sysv/linux/gettimeofday.c#L63">现实</a>流程如下：</p>
+<pre class="mermaid">flowchart TB
+    gettimeofday("gettimeofday()")
+    __gettimeofday("__gettimeofday()")
+    __gettimeofday64("__gettimeofday64()")
+    zmem("memset(tz, 0, sizeof(struct timezone))")
+    __clock_gettime64("__clock_gettime64()")
+    sys_call("INLINE_SYSCALL_CALL(clock_gettime(64))")
+    gettimeofday --> __gettimeofday --> __gettimeofday64 --> zmem & __clock_gettime64
+    __clock_gettime64 --> sys_call</pre>
+<p>而 <code>settimeofday()</code> 的实际<a target="_blank" rel="noopener" href="https://github.com/bminor/glibc/blob/glibc-2.33/sysdeps/unix/sysv/linux/settimeofday.c#L26">现实</a>流程如下：</p>
+<pre class="mermaid">flowchart TB
+    settimeofday("settimeofday()")
+    __settimeofday("__settimeofday()")
+    __settimeofday64("__settimeofday64()")
+    sys_call_1("INLINE_SYSCALL_CALL(settimeofday(tz))")
+    __clock_settime64("__clock_settime64()")
+    sys_call_2("INLINE_SYSCALL_CALL(clock_settime(64))")
+
+settimeofday --> __settimeofday --> __settimeofday64
+__settimeofday64 --> judge{tz != 0\nAND\ntv != 0}
+judge -->|true| sys_call_1
+judge --->|false| inval[INVAL]
+__settimeofday64 --> __clock_settime64 --> sys_call_2</pre>
+<p>由于 <em>glibc</em> 动态库由原厂编译并提供，为了进一步验证我的判断，我在使用 <code>settimeofday()</code> 之后通过库函数以及系统调用输出内核的时区设置：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">test_settimeofday</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">struct</span> <span class="title class_">timezone</span> tz;</span><br><span class="line">    tz = (<span class="keyword">struct</span> timezone) &#123;</span><br><span class="line">        .tz_minuteswest = <span class="number">480</span>,</span><br><span class="line">        .tz_dsttime = <span class="number">0</span>, <span class="comment">/* DST_NONE */</span></span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">settimeofday</span>(<span class="literal">NULL</span>, &amp;tz) &lt; <span class="number">0</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;exec settimeofday failed: %s\n&quot;</span>, std::<span class="built_in">strerror</span>(errno));</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">test_gettimeofday</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> __NR_gettimeofday</span></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;HAS __NR_gettimeofday!\n&quot;</span>);</span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">timezone</span> tz1 &#123;&#125;;</span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">timeval</span> tv1 &#123;&#125;;</span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">syscall</span>(__NR_gettimeofday, &amp;tv1, &amp;tz1) &lt; <span class="number">0</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;exec sys_gettimeofday failed: %s\n&quot;</span>, std::<span class="built_in">strerror</span>(errno));</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;get tz_minuteswest by sys_gettimeofday: %d\n&quot;</span>, tz1.tz_minuteswest);</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">timezone</span> tz2 &#123;&#125;;</span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">timeval</span> tv2 &#123;&#125;;</span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">gettimeofday</span>(&amp;tv2, &amp;tz2) != <span class="number">0</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;exec gettimeofday failed: %s\n&quot;</span>, std::<span class="built_in">strerror</span>(errno));</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;get tz_minuteswest by gettimeofday: %d\n&quot;</span>, tz2.tz_minuteswest);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在运行后发现，发现确实能通过系统回调拿到之前设置的时区值</p>
+<h1 id="探索内核源码"><a href="#探索内核源码" class="headerlink" title="探索内核源码"></a>探索内核源码</h1><p>虽然上面的个方式证明了 <code>settimeofday()</code> 成功修改了内核时区，但是多进程的时区依然未同步，在阅读内核中的 <code>settimeofday()</code> 源码后有所发现，源码如下：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">do_sys_settimeofday64</span><span class="params">(<span class="type">const</span> <span class="keyword">struct</span> timespec64 *tv, <span class="type">const</span> <span class="keyword">struct</span> timezone *tz)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="type">static</span> <span class="type">int</span> firsttime = <span class="number">1</span>;</span><br><span class="line">  <span class="type">int</span> error = <span class="number">0</span>;</span><br><span class="line">  </span><br><span class="line">  ...</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">if</span> (tz) &#123;</span><br><span class="line">    <span class="comment">/* Verify we&#x27;re within the +-15 hrs range */</span></span><br><span class="line">    <span class="keyword">if</span> (tz-&gt;tz_minuteswest &gt; <span class="number">15</span>*<span class="number">60</span> || tz-&gt;tz_minuteswest &lt; <span class="number">-15</span>*<span class="number">60</span>)</span><br><span class="line">      <span class="keyword">return</span> -EINVAL;</span><br><span class="line"></span><br><span class="line">    sys_tz = *tz;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">if</span> (firsttime) &#123;                   <span class="comment">// 实际上对时间的修改只执行了一次</span></span><br><span class="line">      firsttime = <span class="number">0</span>;</span><br><span class="line">      <span class="keyword">if</span> (!tv)                         <span class="comment">// tv存在时不允许修改时区</span></span><br><span class="line">        timekeeping_warp_clock();      <span class="comment">// 计算时区偏移, 对现有的时间进行增加/减少</span></span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">if</span> (tv)</span><br><span class="line">    <span class="keyword">return</span> do_settimeofday64(tv);      <span class="comment">// 修改时间</span></span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>进一步查看 <code>timekeeping_warp_clock()</code> 源码：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment"> * Adjust the time obtained from the CMOS to be UTC time instead of</span></span><br><span class="line"><span class="comment"> * local time.</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * This is ugly, but preferable to the alternatives.  Otherwise we</span></span><br><span class="line"><span class="comment"> * would either need to write a program to do it in /etc/rc (and risk</span></span><br><span class="line"><span class="comment"> * confusion if the program gets run more than once; it would also be</span></span><br><span class="line"><span class="comment"> * hard to make the program warp the clock precisely n hours)  or</span></span><br><span class="line"><span class="comment"> * compile in the timezone information into the kernel.  Bad, bad....</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> *            - TYT, 1992-01-01</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * The best thing to do is to keep the CMOS clock in universal time (UTC)</span></span><br><span class="line"><span class="comment"> * as real UNIX machines always do it. This avoids all headaches about</span></span><br><span class="line"><span class="comment"> * daylight saving times and warping kernel clocks.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">timekeeping_warp_clock</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span> (sys_tz.tz_minuteswest != <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">timespec64</span> <span class="title">adjust</span>;</span></span><br><span class="line">  </span><br><span class="line">    persistent_clock_is_local = <span class="number">1</span>;</span><br><span class="line">    adjust.tv_sec = sys_tz.tz_minuteswest * <span class="number">60</span>;</span><br><span class="line">    adjust.tv_nsec = <span class="number">0</span>;</span><br><span class="line">    timekeeping_inject_offset(&amp;adjust);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>其中注释里面已经给出了解决方案，使用这个方式是更倾向于将系统时间置为 UTC 时间，如果多次修改反而会带来精度损失，而且 <code>timekeeping_inject_offset()</code> 中有锁来保证执行的正确性，所以如果有多个应用频繁调用的话也会带来性能上的损失，因此 <code>do_sys_settimeofday64()</code> 中保证这个操作只执行一次也是如此<br>因此最好的解决方案是<strong>保持系统的时间为 UTC 时间，通过修改应用的 <code>TZ</code> 属性和 <code>tzset()</code> 来修改进程的时区设置</strong></p>
+<h1 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h1><p>有两种解决方案：</p>
+<h2 id="1-完善-etc-localtime-并替换-localtime-r-为-localtime"><a href="#1-完善-etc-localtime-并替换-localtime-r-为-localtime" class="headerlink" title="1. 完善 /etc/localtime 并替换 localtime_r() 为 localtime()"></a>1. 完善 <code>/etc/localtime</code> 并替换 <code>localtime_r()</code> 为 <code>localtime()</code></h2><p>查看下 <em>Linux</em> 下的 <code>/etc/localtime</code> 就不难发现其实是个软连接：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">z@z:~$ ls -lh /etc/localtime</span><br><span class="line">lrwxrwxrwx 1 root root 33  9月 20  2023 /etc/localtime -&gt; /usr/share/zoneinfo/Asia/Shanghai</span><br></pre></td></tr></table></figure>
+<p>只需要将 <code>/usr/share/zoneinfo/</code> 复制到开发板上并链接到 <code>/etc/localtime</code> 即可，为什么可以这样？这个其实是由于 <code>tzset()</code> 的<a target="_blank" rel="noopener" href="https://github.com/bminor/glibc/blob/glibc-2.33/time/tzset.c#L367">代码</a>所决定：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* Interpret the TZ envariable.  */</span></span><br><span class="line"><span class="type">static</span> <span class="type">void</span></span><br><span class="line"><span class="title function_">tzset_internal</span> <span class="params">(<span class="type">int</span> always)</span></span><br><span class="line">&#123;</span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* Examine the TZ environment variable.  */</span></span><br><span class="line">  tz = getenv (<span class="string">&quot;TZ&quot;</span>);</span><br><span class="line"></span><br><span class="line">  ... <span class="comment">// 对TZ解析验证</span></span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 在未设置环境变量的情况下回去读取存放时区配置的默认目录</span></span><br><span class="line">  <span class="keyword">if</span> (tz == <span class="literal">NULL</span>)</span><br><span class="line">    <span class="comment">/* No user specification; use the site-wide default.  */</span></span><br><span class="line">    tz = TZDEFAULT;</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* Try to read a data file.  */</span></span><br><span class="line">  __tzfile_read (tz, <span class="number">0</span>, <span class="literal">NULL</span>);</span><br><span class="line"></span><br><span class="line">  ... <span class="comment">// 未读取到文件则以默认 UTC 时区</span></span><br><span class="line"></span><br><span class="line">  __tzset_parse_tz (tz);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>TZDEFAULT</code> 是一个宏定义，赋值在 <a target="_blank" rel="noopener" href="https://github.com/bminor/glibc/blob/glibc-2.33/time/Makefile#L70">glibc&#x2F;time&#x2F;Makefile</a> 和 <a target="_blank" rel="noopener" href="https://github.com/bminor/glibc/blob/glibc-2.33/timezone/Makefile#L60">glibc&#x2F;timezone&#x2F;Makefile</a> ，定义在 <a target="_blank" rel="noopener" href="https://github.com/bminor/glibc/blob/glibc-2.33/Makeconfig#L258">glibc&#x2F;Makeconfig</a>，通常情况下一般定义在 <code>/etc/localtime</code> ，有自定义需求则需要查看下定义的路径在哪</p>
+<h3 id="localtime-和-localtime-r-的区别"><a href="#localtime-和-localtime-r-的区别" class="headerlink" title="localtime() 和 localtime_r() 的区别"></a><code>localtime()</code> 和 <code>localtime_r()</code> 的区别</h3><p>两者底层的<a target="_blank" rel="noopener" href="https://github.com/bminor/glibc/blob/glibc-2.33/time/localtime.c">调用</a>均是  <a target="_blank" rel="noopener" href="https://github.com/bminor/glibc/blob/glibc-2.33/time/tzset.c#L567"><code>__tz_convert()</code>⚡</a>，主要区别在于传递的 <code>tp</code> 不一样，<code>localtime()</code> 传递的是一个全局变量的 <code>_tmbuf</code>，而 <code>localtime_r()</code> 则是由调用者传入：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* The C Standard says that localtime and gmtime return the same pointer.  */</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">tm</span> _<span class="title">tmbuf</span>;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* Return the `struct tm&#x27; representation of *T in local time,</span></span><br><span class="line"><span class="comment">   using *TP to store the result.  */</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">tm</span> *</span></span><br><span class="line"><span class="class">__<span class="title">localtime64_r</span> (<span class="title">const</span> __<span class="title">time64_t</span> *<span class="title">t</span>, <span class="keyword">struct</span> <span class="title">tm</span> *<span class="title">tp</span>)</span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">  <span class="keyword">return</span> __tz_convert (*t, <span class="number">1</span>, tp);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">...</span><br><span class="line"></span><br><span class="line"><span class="comment">/* Return the `struct tm&#x27; representation of *T in local time.  */</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">tm</span> *</span></span><br><span class="line"><span class="class">__<span class="title">localtime64</span> (<span class="title">const</span> __<span class="title">time64_t</span> *<span class="title">t</span>)</span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">  <span class="keyword">return</span> __tz_convert (*t, <span class="number">1</span>, &amp;_tmbuf);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>而 <code>__tz_convert()</code> 正是通过判断 <code>tp</code> 来判断是否读取环境和时区文件并进行进一步解析：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* Return the `struct tm&#x27; representation of TIMER in the local timezone.</span></span><br><span class="line"><span class="comment">   Use local time if USE_LOCALTIME is nonzero, UTC otherwise.  */</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">tm</span> *</span></span><br><span class="line"><span class="class">__<span class="title">tz_convert</span> (__<span class="title">time64_t</span> <span class="title">timer</span>, <span class="title">int</span> <span class="title">use_localtime</span>, <span class="keyword">struct</span> <span class="title">tm</span> *<span class="title">tp</span>)</span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* Update internal database according to current TZ setting.</span></span><br><span class="line"><span class="comment">     POSIX.1 8.3.7.2 says that localtime_r is not required to set tzname.</span></span><br><span class="line"><span class="comment">     This is a good idea since this allows at least a bit more parallelism.  */</span></span><br><span class="line">  tzset_internal (tp == &amp;_tmbuf &amp;&amp; use_localtime);</span><br><span class="line">  <span class="comment">// __use_tzfile 由 tzset_internal 中读取文件的操作进行调整</span></span><br><span class="line">  <span class="keyword">if</span> (__use_tzfile)</span><br><span class="line">    __tzfile_compute (timer, use_localtime, &amp;leap_correction,</span><br><span class="line">		      &amp;leap_extra_secs, tp);</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">    &#123;</span><br><span class="line">		...</span><br><span class="line">    &#125;</span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>而 <code>localtime_r()</code> 就需要调用者手动调用 <code>tzset()</code> 来进一步控制时区：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 设置TZ</span></span><br><span class="line"><span class="keyword">if</span> (<span class="built_in">setenv</span>(<span class="string">&quot;TZ&quot;</span>, <span class="string">&quot;GMT-8&quot;</span>, <span class="number">1</span>) != <span class="number">0</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;failed to set TZ environment variable.\n&quot;</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 更新库中的时区参数</span></span><br><span class="line"><span class="built_in">tzset</span>();</span><br></pre></td></tr></table></figure>
+<h3 id="有什么缺点？"><a href="#有什么缺点？" class="headerlink" title="有什么缺点？"></a>有什么缺点？</h3><p>关键在于 <code>localtime()</code> ，它在未读取到 <code>TZ</code> 变量时会去读取配置文件进行调整时区，以至于在每次调用的时候均会进行这样的操作，导致了不必要的开销，这也是为什么 <em>spdlog</em> 调用的是 <code>localtime_r()</code> 而不是它。那么由此可以引入第二套方案</p>
+<h2 id="2-采用-IPC-方式动态设置应用时区的环境变量"><a href="#2-采用-IPC-方式动态设置应用时区的环境变量" class="headerlink" title="2. 采用 IPC 方式动态设置应用时区的环境变量"></a>2. 采用 IPC 方式动态设置应用时区的环境变量</h2><p>其实很简单，在拥有 IPC 中间件的基础上只需要传递对应的数据再通过上面的 <code>tzset()</code> 的流程就可以了</p>
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E9%97%AE%E9%A2%98%EF%BC%9F"><span class="top-box-text">问题？</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%B0%9D%E8%AF%95%E8%A7%A3%E5%86%B3"><span class="top-box-text">尝试解决</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%8E%A2%E7%B4%A2%E5%86%85%E6%A0%B8%E6%BA%90%E7%A0%81"><span class="top-box-text">探索内核源码</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="top-box-text">解决方案</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#1-%E5%AE%8C%E5%96%84-etc-localtime-%E5%B9%B6%E6%9B%BF%E6%8D%A2-localtime-r-%E4%B8%BA-localtime"><span class="top-box-text">1. 完善 &#x2F;etc&#x2F;localtime 并替换 localtime_r() 为 localtime()</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#localtime-%E5%92%8C-localtime-r-%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="top-box-text">localtime() 和 localtime_r() 的区别</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E6%9C%89%E4%BB%80%E4%B9%88%E7%BC%BA%E7%82%B9%EF%BC%9F"><span class="top-box-text">有什么缺点？</span></a></li></ol></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#2-%E9%87%87%E7%94%A8-IPC-%E6%96%B9%E5%BC%8F%E5%8A%A8%E6%80%81%E8%AE%BE%E7%BD%AE%E5%BA%94%E7%94%A8%E6%97%B6%E5%8C%BA%E7%9A%84%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F"><span class="top-box-text">2. 采用 IPC 方式动态设置应用时区的环境变量</span></a></li></ol></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2024/05/16/arm-arch/">
+          <h3 class="post-title">
+            下一篇：嵌入式下多应用架构
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+
+
+
+
+
+
+
+
+<footer>
+<div class="site-footer">
+  <div class="social-container">
+    
+      
+        <a aria-label="跳转至github" href="https://github.com/f-dong" target="_blank">
+          <i class="icon icon-github"></i>
+        </a>
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+  </div>
+  
+    Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+  
+  
+  
+  
+  
+  
+</div>
+<script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({theme: 'dark'});
+  }
+</script>
+</footer>
+
+
+      </div>
+    </div>
+    
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+  </body>
+</html>
+

@@ -10,22 +10,42 @@
 <meta charset="utf-8" >
 
 <title>GDB常用命令</title>
-<meta name="keywords" content="GDB常用命令, Hexo">
-<meta name="description" content="GDB调试-从入门实践到原理
-#GDB #Linux 
+<meta name="keywords" content="GDB常用命令, ZYXeeker`s blog">
+<meta name="description" content="
+转载至GDB调试-从入门实践到原理
+
 
 gcc -g t1.c -o t1
-需要加 -g 来产生调试符号, 否则GDB会出现 Make breakpoint pending on future shared library">
+需要加 -g 来产生调试符号, 否则GDB会出现 Make breakpoint pending on future shared library load?
+断">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta property="og:title" content="GDB常用命令">
-<meta property="og:description" content="GDB调试-从入门实践到原理
-#GDB #Linux 
+<meta property="og:description" content="
+转载至GDB调试-从入门实践到原理
+
 
 gcc -g t1.c -o t1
-需要加 -g 来产生调试符号, 否则GDB会出现 Make breakpoint pending on future shared library">
+需要加 -g 来产生调试符号, 否则GDB会出现 Make breakpoint pending on future shared library load?
+断">
 
+
+<script src="/js/mermaid.min.js"></script>
+
+<script>
+  $(document).ready(function() {
+      var mermaid_config = {
+          startOnLoad: true,
+          theme: 'default',
+          flowchart:{
+              useMaxWidth: false,
+              htmlLabels: true
+          }                
+      }
+      mermaid.initialize(mermaid_config);
+  });
+</script>
 <link rel="shortcut icon" href="/favicon.ico">
 <link rel="stylesheet" href="/style/main.css">
 
@@ -36,11 +56,11 @@ gcc -g t1.c -o t1
 <div class="site-header-container">
   <div class="site-header">
     <div class="left">
-      <a href="http://example.com">
+      <a href="https://www.zyxeeker.top">
         <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
       </a>
-      <a href="http://example.com">
-        <h1 class="site-title">Hexo</h1>
+      <a href="https://www.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
       </a>
     </div>
     <div class="right">
@@ -101,8 +121,9 @@ gcc -g t1.c -o t1
       </div>
       <div class="post-content-wrapper">
         <div class="post-content">
-          <p><a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s?__biz=Mzk0MzI4OTI1Ng==&mid=2247486816&idx=1&sn=a6dfc1361ce15ce5ad1c7d7734f9c939&chksm=c3376ba7f440e2b18267c303c35572ab089fb97d3b2fe0adb58009637d6631020bb52bd9a28c&mpshare=1&scene=23&srcid=01051o6nvEZy8CiMkGqe21L1&sharer_sharetime=1641358839534&sharer_shareid=59b77bb81921eb41ef126368348abb4d#rd">GDB调试-从入门实践到原理</a></p>
-<p>#GDB #Linux </p>
+          <blockquote>
+<p>转载至<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s?__biz=Mzk0MzI4OTI1Ng==&mid=2247486816&idx=1&sn=a6dfc1361ce15ce5ad1c7d7734f9c939&chksm=c3376ba7f440e2b18267c303c35572ab089fb97d3b2fe0adb58009637d6631020bb52bd9a28c&mpshare=1&scene=23&srcid=01051o6nvEZy8CiMkGqe21L1&sharer_sharetime=1641358839534&sharer_shareid=59b77bb81921eb41ef126368348abb4d#rd">GDB调试-从入门实践到原理</a></p>
+</blockquote>
 <hr>
 <figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">gcc -g t1.c -o t1</span><br></pre></td></tr></table></figure>
 <p>需要加 <em>-g</em> 来产生调试符号, 否则GDB会出现 <em>Make breakpoint pending on future shared library load?</em></p>
@@ -627,6 +648,12 @@ gcc -g t1.c -o t1
   
   
 </div>
+<script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({theme: 'dark'});
+  }
+</script>
 </footer>
 
 

@@ -9,15 +9,31 @@
 
 <meta charset="utf-8" >
 
-<title>Hexo</title>
-<meta name="keywords" content="Hexo, Hexo">
-<meta name="description" content="Hexo">
+<title>ZYXeeker`s blog</title>
+<meta name="keywords" content="ZYXeeker`s blog, ZYXeeker`s blog">
+<meta name="description" content="ZYXeeker`s blog">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta property="og:title" content="Hexo">
-<meta property="og:description" content="Hexo">
+<meta property="og:title" content="ZYXeeker`s blog">
+<meta property="og:description" content="ZYXeeker`s blog">
 
+
+<script src="/js/mermaid.min.js"></script>
+
+<script>
+  $(document).ready(function() {
+      var mermaid_config = {
+          startOnLoad: true,
+          theme: 'default',
+          flowchart:{
+              useMaxWidth: false,
+              htmlLabels: true
+          }                
+      }
+      mermaid.initialize(mermaid_config);
+  });
+</script>
 <link rel="shortcut icon" href="/favicon.ico">
 <link rel="stylesheet" href="/style/main.css">
 
@@ -28,11 +44,11 @@
 <div class="site-header-container">
   <div class="site-header">
     <div class="left">
-      <a href="http://example.com">
+      <a href="https://www.zyxeeker.top">
         <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
       </a>
-      <a href="http://example.com">
-        <h1 class="site-title">Hexo</h1>
+      <a href="https://www.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
       </a>
     </div>
     <div class="right">
@@ -79,29 +95,25 @@
 
 <section class="post-item">
     <div class="content">
-      <a href="/2024/04/02/logger_3/">
-        <h2 class="post-title">日志器（三）等级</h2>
+      <a href="/2024/05/24/cfg-cvt/">
+        <h2 class="post-title">C++中配置转换设计</h2>
       </a>
-      <a href="/2024/04/02/logger_3/">
+      <a href="/2024/05/24/cfg-cvt/">
           <div class="post-abstract">
             
-			    在使用日志时，我们需要对不同的情况进行输出，因此可以大致分为不同的等级：
-
-DEBUG：Debug调试信息
-INFO：普通信息输出提示
-WARN：超出接口&#x2F;业务逻辑处理范围或者不兼容时提示
-ERROR：接口&#x2F;业务逻辑处理
+			    问题？在使用 JsonCpp 相关的库对配置数据进行读写时，有可能会出现这样的问题，首先写入数据到文件：
+// 写入数据uint32_t width  = 1920;uint32_t height = 1080;uint32_t fps  
             
           </div>
       </a>
       <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-04-02</span>
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-24</span>
         
           <span>
             <i class="icon icon-pricetags-outline"></i>
             
 
-                c++
+                C++
                 
             
           </span>
@@ -114,25 +126,27 @@ ERROR：接口&#x2F;业务逻辑处理
 
 <section class="post-item">
     <div class="content">
-      <a href="/2024/04/01/logger_2/">
-        <h2 class="post-title">日志器（二）文件名, 函数名, 行号</h2>
+      <a href="/2024/05/24/cfg-observer/">
+        <h2 class="post-title">C++中配置监听设计</h2>
       </a>
-      <a href="/2024/04/01/logger_2/">
+      <a href="/2024/05/24/cfg-observer/">
           <div class="post-abstract">
             
-			    在调用日志输出的时候，我们希望在输出的时候可以同时输出被调用处的文件名，函数名，行号甚至是线程名&#x2F;ID
-修改接口所以可以在构造函数处添加 const char* file, const char* function, uint64
+			    
+本文是对上篇文章（C++中配置转换设计）的运用前置知识：模板，完美转发，智能指针，设计模式-监听模式
+
+场景运用在项目中有时需要对一些配置变量发生改动时进行回调监听，不仅发生在被其他调用者修改的场景，也可能存在对应的配置管理器需要监听文件
             
           </div>
       </a>
       <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-04-01</span>
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-24</span>
         
           <span>
             <i class="icon icon-pricetags-outline"></i>
             
 
-                c++
+                C++
                 
             
           </span>
@@ -145,26 +159,28 @@ ERROR：接口&#x2F;业务逻辑处理
 
 <section class="post-item">
     <div class="content">
-      <a href="/2024/03/29/logger_1/">
-        <h2 class="post-title">日志器（一）基础功能</h2>
+      <a href="/2024/05/20/arm-processes-tz/">
+        <h2 class="post-title">Arm下多进程时区问题</h2>
       </a>
-      <a href="/2024/03/29/logger_1/">
+      <a href="/2024/05/20/arm-processes-tz/">
           <div class="post-abstract">
             
-			    对于以往常用的输出调用方式来说，我们希望可以像 printf 那样可以指定输出格式，同时也可以像 cout 那样使用 &lt;&lt; 来进行方便快捷的输出
-接口设计所以可以大致设计如下接口：
-class Logger &#123; pub
+			    
+版本依据Glibc-2.33, Kernel-5.10.117
+
+对于不需要时间同步的情况来说，在程序运行前 env 中设置好 TZ 的相关参数即可，这里主要记录存在 NTP 服务情况下的处理方式
+问题？在多进程下，NTP 由另一个应用的
             
           </div>
       </a>
       <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-03-29</span>
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-20</span>
         
           <span>
             <i class="icon icon-pricetags-outline"></i>
             
 
-                c++
+                ARM, Kernel, Glibc, Linux
                 
             
           </span>
@@ -177,18 +193,29 @@ class Logger &#123; pub
 
 <section class="post-item">
     <div class="content">
-      <a href="/2024/03/28/hello-world/">
-        <h2 class="post-title">Hello World</h2>
+      <a href="/2024/05/16/arm-arch/">
+        <h2 class="post-title">嵌入式下多应用架构</h2>
       </a>
-      <a href="/2024/03/28/hello-world/">
+      <a href="/2024/05/16/arm-arch/">
           <div class="post-abstract">
             
-			    Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hex
+			    单体应用时间带来的变化在早期的业务中嵌入式应用中只需要简单的对设备上的硬件资源进行整合和调用，并将需要的数据传递给上层设备交予其中的应用进行解析和应用，所以当时的结构及其简单：
+flowchart TB
+    subgraph Devic
             
           </div>
       </a>
       <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-03-28</span>
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-16</span>
+        
+          <span>
+            <i class="icon icon-pricetags-outline"></i>
+            
+
+                ARM, Arch, Linux
+                
+            
+          </span>
         
       </div>
     </div>
@@ -204,11 +231,13 @@ class Logger &#123; pub
       <a href="/2022/01/05/gdb/">
           <div class="post-abstract">
             
-			    GDB调试-从入门实践到原理
-#GDB #Linux 
+			    
+转载至GDB调试-从入门实践到原理
+
 
 gcc -g t1.c -o t1
-需要加 -g 来产生调试符号, 否则GDB会出现 Make breakpoint pending on future shared library
+需要加 -g 来产生调试符号, 否则GDB会出现 Make breakpoint pending on future shared library load?
+断
             
           </div>
       </a>
@@ -263,6 +292,12 @@ gcc -g t1.c -o t1
   
   
 </div>
+<script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({theme: 'dark'});
+  }
+</script>
 </footer>
 
 
