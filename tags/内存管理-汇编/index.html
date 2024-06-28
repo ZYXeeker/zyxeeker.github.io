@@ -89,9 +89,15 @@
 
 
 
-  <div class="content-container">
+<div class="content-container">
 
-    
+  <div class="current-tag-container">
+    <h2 class="title">
+      <i class="icon icon-pricetags-outline"></i> 内存管理, 汇编
+    </h2>
+  </div>
+
+  
 
 <section class="post-item">
     <div class="content">
@@ -127,176 +133,10 @@ DEMO示例代码int test1(int a, int b) &#1
 
 
 
-<section class="post-item">
-    <div class="content">
-      <a href="/2024/05/29/cfg-observer/">
-        <h2 class="post-title">C++中配置监听设计</h2>
-      </a>
-      <a href="/2024/05/29/cfg-observer/">
-          <div class="post-abstract">
-            
-			    
-本文是对上篇文章（C++中配置转换设计）的运用前置知识：模板，完美转发，智能指针，设计模式-监听模式
-
-场景运用在项目中有时需要对一些配置变量发生改动时进行回调监听，不仅发生在被其他调用者修改的场景，也可能存在对应的配置管理器需要监听文件
-            
-          </div>
-      </a>
-      <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-05-29</span>
-        
-          <span>
-            <i class="icon icon-pricetags-outline"></i>
-            
-
-                C++
-                
-            
-          </span>
-        
-      </div>
-    </div>
-  </section>
 
 
 
-<section class="post-item">
-    <div class="content">
-      <a href="/2024/05/24/cfg-cvt/">
-        <h2 class="post-title">C++中配置转换设计</h2>
-      </a>
-      <a href="/2024/05/24/cfg-cvt/">
-          <div class="post-abstract">
-            
-			    问题？在使用 JsonCpp 相关的库对配置数据进行读写时，有可能会出现这样的问题，首先写入数据到文件：
-// 写入数据uint32_t width  = 1920;uint32_t height = 1080;uint32_t fps  
-            
-          </div>
-      </a>
-      <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-05-24</span>
-        
-          <span>
-            <i class="icon icon-pricetags-outline"></i>
-            
-
-                C++
-                
-            
-          </span>
-        
-      </div>
-    </div>
-  </section>
-
-
-
-<section class="post-item">
-    <div class="content">
-      <a href="/2024/05/20/arm-processes-tz/">
-        <h2 class="post-title">Arm下多进程时区问题</h2>
-      </a>
-      <a href="/2024/05/20/arm-processes-tz/">
-          <div class="post-abstract">
-            
-			    
-版本依据Glibc-2.33, Kernel-5.10.117
-
-对于不需要时间同步的情况来说，在程序运行前 env 中设置好 TZ 的相关参数即可，这里主要记录存在 NTP 服务情况下的处理方式
-问题？在多进程下，NTP 由另一个应用的
-            
-          </div>
-      </a>
-      <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-05-20</span>
-        
-          <span>
-            <i class="icon icon-pricetags-outline"></i>
-            
-
-                ARM, Kernel, Glibc, Linux
-                
-            
-          </span>
-        
-      </div>
-    </div>
-  </section>
-
-
-
-<section class="post-item">
-    <div class="content">
-      <a href="/2024/05/16/arm-arch/">
-        <h2 class="post-title">嵌入式下多应用架构</h2>
-      </a>
-      <a href="/2024/05/16/arm-arch/">
-          <div class="post-abstract">
-            
-			    单体应用时间带来的变化在早期的业务中嵌入式应用中只需要简单的对设备上的硬件资源进行整合和调用，并将需要的数据传递给上层设备交予其中的应用进行解析和应用，所以当时的结构及其简单：
-flowchart TB
-    subgraph Devic
-            
-          </div>
-      </a>
-      <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-05-16</span>
-        
-          <span>
-            <i class="icon icon-pricetags-outline"></i>
-            
-
-                ARM, Arch, Linux
-                
-            
-          </span>
-        
-      </div>
-    </div>
-  </section>
-
-
-
-<section class="post-item">
-    <div class="content">
-      <a href="/2022/01/05/gdb/">
-        <h2 class="post-title">GDB常用命令</h2>
-      </a>
-      <a href="/2022/01/05/gdb/">
-          <div class="post-abstract">
-            
-			    
-转载至GDB调试-从入门实践到原理
-
-
-gcc -g t1.c -o t1
-需要加 -g 来产生调试符号, 否则GDB会出现 Make breakpoint pending on future shared library load?
-断
-            
-          </div>
-      </a>
-      <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2022-01-05</span>
-        
-          <span>
-            <i class="icon icon-pricetags-outline"></i>
-            
-
-                GDB
-                
-            
-          </span>
-        
-      </div>
-    </div>
-  </section>
-
-
-
-
-
-
-  </div>
+</div>
 
 <footer>
     <div class="site-footer">

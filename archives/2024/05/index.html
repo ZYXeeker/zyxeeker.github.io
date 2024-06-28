@@ -4,7 +4,7 @@
     
 
     
-<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+<script>!function(){document.documentElement.classList.toggle("dark",!0)}()</script>
     
 
 <meta charset="utf-8" >
@@ -18,7 +18,7 @@
 <meta property="og:title" content="ZYXeeker`s blog">
 <meta property="og:description" content="ZYXeeker`s blog">
 
-
+<!-- 
 <script src="/js/mermaid.min.js"></script>
 
 <script>
@@ -33,7 +33,7 @@
       }
       mermaid.initialize(mermaid_config);
   });
-</script>
+</script> -->
 <link rel="shortcut icon" href="/favicon.ico">
 <link rel="stylesheet" href="/style/main.css">
 
@@ -99,10 +99,10 @@
     
       
         <article class="post">
-          <a href="/2024/05/24/cfg-cvt/">
+          <a href="/2024/05/29/cfg-observer/">
             <h2 class="post-title">
-              C++中配置转换设计
-              <small style="color: gray;">2024-05-24</small>
+              C++中配置监听设计
+              <small style="color: gray;">2024-05-29</small>
             </h2>
           </a>
         </article>
@@ -110,9 +110,9 @@
     
       
         <article class="post">
-          <a href="/2024/05/24/cfg-observer/">
+          <a href="/2024/05/24/cfg-cvt/">
             <h2 class="post-title">
-              C++中配置监听设计
+              C++中配置转换设计
               <small style="color: gray;">2024-05-24</small>
             </h2>
           </a>
@@ -148,45 +148,65 @@
   </div>
 
 <footer>
-<div class="site-footer">
-  <div class="social-container">
-    
-      
-        <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
-          <i class="icon icon-github"></i>
-        </a>
-      
-    
-      
-    
-      
-    
-      
-    
-      
-    
-  </div>
-  
-    Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
-  
-  
-  
-  
-  
-  
-</div>
-<script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
-<script>
-  if (window.mermaid) {
-    mermaid.initialize({theme: 'dark'});
-  }
-</script>
-</footer>
-
-
-      </div>
+    <div class="site-footer">
+        <div class="social-container">
+            
+            
+            <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
+                <i class="icon icon-github"></i>
+            </a>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+        </div>
+        
+        Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a
+            href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+        
+        
+        
+        
+        
+        
     </div>
-    
+    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            mermaid.initialize({
+                theme: 'dark'
+            });
+        }
+    </script>
+    <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+</footer>
+<style type="text/css">
+  @media (prefers-color-scheme: dark)
+  {
+      svg {
+          filter: invert(93%) hue-rotate(180deg);
+          background-color: transparent !important;
+      }
+      image {
+          filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+      }
+  }
+
+  .mxgraph-container {
+    display: flex;
+    justify-content: center;
+  }
+  </style>
+
+</div>
+</div>
+
 <script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = false; </script>
 
 <script src="/js/main.js"></script>
@@ -196,7 +216,8 @@
 
 
 
-  </body>
+</body>
+
 </html>
 
 
