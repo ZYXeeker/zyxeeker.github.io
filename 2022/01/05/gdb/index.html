@@ -652,30 +652,34 @@ gcc -g t1.c -o t1
     <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
     <script>
         if (window.mermaid) {
+            // 检查用户的首选颜色模式
+            const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
             mermaid.initialize({
-                theme: 'dark'
+                theme: isDarkMode ? 'dark' : 'base'
             });
         }
+
     </script>
     <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
-</footer>
-<style type="text/css">
-  @media (prefers-color-scheme: dark)
-  {
-      svg {
-          filter: invert(93%) hue-rotate(180deg);
-          background-color: transparent !important;
-      }
-      image {
-          filter: invert(100%) hue-rotate(180deg) saturate(1.25);
-      }
-  }
+    <style type="text/css">
+        @media (prefers-color-scheme: dark) {
+            svg {
+                filter: invert(93%) hue-rotate(180deg);
+                background-color: transparent !important;
+            }
 
-  .mxgraph-container {
-    display: flex;
-    justify-content: center;
-  }
-  </style>
+            image {
+                filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+            }
+        }
+
+        .mxgraph-container {
+            display: flex;
+            justify-content: center;
+        }
+
+    </style>
+</footer>
 
 </div>
 </div>
