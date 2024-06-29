@@ -155,8 +155,9 @@
         if (window.mermaid) {
             // 检查用户的首选颜色模式
             const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            console.log(isDarkMode);
             mermaid.initialize({
-                theme: isDarkMode ? 'dark' : 'base'
+                theme: isDarkMode ? 'neutral' : 'base'
             });
         }
 
