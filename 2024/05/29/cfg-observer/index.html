@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
   <head>
     
 
@@ -24,22 +24,6 @@
 
 场景运用在项目中有时需要对一些配置变量发生改动时进行回调监听，不仅发生在被其他调用者修改的场景，也可能存在对应的配置管理器需要监听文件">
 
-<!-- 
-<script src="/js/mermaid.min.js"></script>
-
-<script>
-  $(document).ready(function() {
-      var mermaid_config = {
-          startOnLoad: true,
-          theme: 'default',
-          flowchart:{
-              useMaxWidth: false,
-              htmlLabels: true
-          }                
-      }
-      mermaid.initialize(mermaid_config);
-  });
-</script> -->
 <link rel="shortcut icon" href="/favicon.ico">
 <link rel="stylesheet" href="/style/main.css">
 
@@ -274,6 +258,7 @@ direction LR
         
         
     </div>
+    <!-- mermaid -->
     <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
     <script>
         if (window.mermaid) {
@@ -283,8 +268,8 @@ direction LR
                 theme: isDarkMode ? 'neutral' : 'base'
             });
         }
-
     </script>
+    <!-- diagrams -->
     <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
     <style type="text/css">
         @media (prefers-color-scheme: dark) {
@@ -302,9 +287,9 @@ direction LR
             display: flex;
             justify-content: center;
         }
-
     </style>
 </footer>
+
 
 </div>
 </div>

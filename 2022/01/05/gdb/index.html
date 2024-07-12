@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
   <head>
     
 
@@ -30,22 +30,6 @@ gcc -g t1.c -o t1
 需要加 -g 来产生调试符号, 否则GDB会出现 Make breakpoint pending on future shared library load?
 断">
 
-<!-- 
-<script src="/js/mermaid.min.js"></script>
-
-<script>
-  $(document).ready(function() {
-      var mermaid_config = {
-          startOnLoad: true,
-          theme: 'default',
-          flowchart:{
-              useMaxWidth: false,
-              htmlLabels: true
-          }                
-      }
-      mermaid.initialize(mermaid_config);
-  });
-</script> -->
 <link rel="shortcut icon" href="/favicon.ico">
 <link rel="stylesheet" href="/style/main.css">
 
@@ -649,6 +633,7 @@ gcc -g t1.c -o t1
         
         
     </div>
+    <!-- mermaid -->
     <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
     <script>
         if (window.mermaid) {
@@ -658,8 +643,8 @@ gcc -g t1.c -o t1
                 theme: isDarkMode ? 'neutral' : 'base'
             });
         }
-
     </script>
+    <!-- diagrams -->
     <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
     <style type="text/css">
         @media (prefers-color-scheme: dark) {
@@ -677,9 +662,9 @@ gcc -g t1.c -o t1
             display: flex;
             justify-content: center;
         }
-
     </style>
 </footer>
+
 
 </div>
 </div>

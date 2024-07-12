@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
   <head>
     
 
@@ -12,36 +12,20 @@
 <title>Atomic Weapons 笔记</title>
 <meta name="keywords" content="Atomic Weapons 笔记, ZYXeeker`s blog">
 <meta name="description" content="
-源于 Herb Sutter的 “C++ and Beyond 2012: atomic Weapons” 对的一些笔记，以及对 atomic 的理解
+源于 Herb Sutter 的 “C++ and Beyond 2012: atomic Weapons” 对的一些笔记，以及对 atomic 的理解
 
 关于顺序一致性顺序一致性 Sequential consistency (SC)
-t">
+">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta property="og:title" content="Atomic Weapons 笔记">
 <meta property="og:description" content="
-源于 Herb Sutter的 “C++ and Beyond 2012: atomic Weapons” 对的一些笔记，以及对 atomic 的理解
+源于 Herb Sutter 的 “C++ and Beyond 2012: atomic Weapons” 对的一些笔记，以及对 atomic 的理解
 
 关于顺序一致性顺序一致性 Sequential consistency (SC)
-t">
+">
 
-<!-- 
-<script src="/js/mermaid.min.js"></script>
-
-<script>
-  $(document).ready(function() {
-      var mermaid_config = {
-          startOnLoad: true,
-          theme: 'default',
-          flowchart:{
-              useMaxWidth: false,
-              htmlLabels: true
-          }                
-      }
-      mermaid.initialize(mermaid_config);
-  });
-</script> -->
 <link rel="shortcut icon" href="/favicon.ico">
 <link rel="stylesheet" href="/style/main.css">
 
@@ -118,7 +102,7 @@ t">
       <div class="post-content-wrapper">
         <div class="post-content">
           <blockquote>
-<p>源于 Herb Sutter的 “C++ and Beyond 2012: atomic Weapons” 对的一些笔记，以及对 atomic 的理解</p>
+<p>源于 Herb Sutter 的 “C++ and Beyond 2012: atomic Weapons” 对的一些笔记，以及对 atomic 的理解</p>
 </blockquote>
 <h1 id="关于顺序一致性"><a href="#关于顺序一致性" class="headerlink" title="关于顺序一致性"></a>关于顺序一致性</h1><h2 id="顺序一致性-Sequential-consistency-SC"><a href="#顺序一致性-Sequential-consistency-SC" class="headerlink" title="顺序一致性 Sequential consistency (SC)"></a>顺序一致性 Sequential consistency (SC)</h2><blockquote>
 <p>the result of any execution is the same as if the reads and writes occurred in some order, and the operations of each individual processor appear in this sequence in the order specified by its program  (Leslie Lamport, 1979)<br><em>倘若读写顺序按照一定的顺序进行执行，那么执行的结果将会是一致的，并且出现在每个处理器的指令顺序完全由它的程序所指定</em></p>
@@ -153,9 +137,9 @@ t">
  &nbsp;&nbsp;但绝不会❌&nbsp;&nbsp;
  </div>
  <figure class="highlight c++"><table><tr><td class="code"><pre><span class="line">y = <span class="number">13</span>;</span><br><span class="line">mutex.<span class="built_in">lock</span>();</span><br><span class="line">:::</span><br><span class="line">mutex.<span class="built_in">unlock</span>();</span><br><span class="line">x = <span class="number">12</span>;</span><br></pre></td></tr></table></figure>
- </div>
-*而 Acquire 和 Release 承担了怎样的角色呢？*</li>
+ </div></li>
 </ol>
+<p><em>而 Acquire 和 Release 承担了怎样的角色呢？</em></p>
 <ul>
 <li>Acquire 之前的代码可以移入到临界区开始之后</li>
 <li>Release 之后的代码可以移入到临界区结束之前<br>所以 Acquire 和 Release 两个操作可以理解成<strong>单向内存屏障</strong>（<em>acquire barrier</em>，<em>release barrier</em> ），而 <em>SC</em> 则是一个<strong>双向内存屏障</strong>（<em>Full Fence</em>），因此它们就相当于比 <em>SC</em> 更宽松的一种屏障来约束指令重排，关系如下：</li>
@@ -250,11 +234,12 @@ t">
 <ol>
 <li>发生在 <code>launch_workers()</code> 之后</li>
 <li>发生在 <code>join_workers()</code> 之前（ <em>Happens-before</em> ）</li>
-<li>每个线程需要能够看到 <code>stop</code> 的变化（ <em>Synchronizes-with</em> ）<br>因此该操作只能选择使用 <em>memory_order_seq_cst</em> 来保证前后的指令不会跨越它进行优化的同时保证变化能够及时的让每个线程可以看到，而循环中对 <code>stop</code> 的读取使用 <em>memory_order_relaxed</em> 即可<br><code>dirty</code> 这块均可以使用 <em>memory_order_relaxed</em><blockquote>
+<li>每个线程需要能够看到 <code>stop</code> 的变化（ <em>Synchronizes-with</em> ）</li>
+</ol>
+<p>因此该操作只能选择使用 <em>memory_order_seq_cst</em> 来保证前后的指令不会跨越它进行优化的同时保证变化能够及时的让每个线程可以看到，而循环中对 <code>stop</code> 的读取使用 <em>memory_order_relaxed</em> 即可<br><code>dirty</code> 这块均可以使用 <em>memory_order_relaxed</em></p>
+<blockquote>
 <p>最开始我看 Herb Sutter 在视频里对 <code>dirty</code> 使用的是 <em>Release-Acquire</em> 但后面参考发布的 PPT 发现，两者均用的是 <em>Relaxed</em>，他对此的解释如下：<br><em>dirty can be relaxed, relying on “join”‘s ordering (doesn’t itself publish data).</em><br><strong>其实也就是说明线程的生命周期结束时，间接的保证了数据同步</strong></p>
 </blockquote>
-</li>
-</ol>
 <figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="comment">// global</span></span><br><span class="line">atomic_bool stop = <span class="literal">false</span>;</span><br><span class="line">atomic_bool dirty = <span class="literal">false</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Threads 1..N</span></span><br><span class="line"><span class="keyword">while</span>(!stop.<span class="built_in">load</span>(memory_order_relaxed)) &#123;</span><br><span class="line">  :::</span><br><span class="line">  <span class="keyword">if</span> (...) &#123;</span><br><span class="line">    dirty.<span class="built_in">store</span>(<span class="literal">true</span>, memory_order_relaxed);</span><br><span class="line">  &#125;</span><br><span class="line">  :::</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="built_in">main</span>() &#123;</span><br><span class="line">  <span class="built_in">launch_workers</span>();</span><br><span class="line">  stop = <span class="literal">true</span>;      <span class="comment">// 默认为 memory_order_seq_cst</span></span><br><span class="line">  <span class="built_in">join_workers</span>();</span><br><span class="line">  <span class="keyword">if</span> (dirty.<span class="built_in">load</span>(memory_order_relaxed)) &#123;</span><br><span class="line">    :::</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <h3 id="引用计数"><a href="#引用计数" class="headerlink" title="引用计数"></a>引用计数</h3><p>Herb Sutter 这里引用的是 C++ 智能指针的源码：</p>
 <figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="comment">// Threads 1: Increment.</span></span><br><span class="line"><span class="comment">// (inside, say, smart_ptr copy ctor)</span></span><br><span class="line">:::</span><br><span class="line">control_block_ptr = other-&gt;control_block_ptr;</span><br><span class="line">++control_block_ptr-&gt;refs;</span><br><span class="line">:::</span><br><span class="line"></span><br><span class="line"><span class="comment">// Thread 2: Decrement.</span></span><br><span class="line"><span class="comment">// (inside, say, smart_ptr dtor)</span></span><br><span class="line">:::</span><br><span class="line"><span class="keyword">if</span>(--control_block_ptr-&gt;refs == <span class="number">0</span>)</span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">delete</span> control_block_ptr;</span><br><span class="line">:::</span><br></pre></td></tr></table></figure>
@@ -267,7 +252,7 @@ t">
 <figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="function">A <span class="title">A::GetInstance</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="type">static</span> A inst;</span><br><span class="line">  <span class="keyword">return</span> &amp;A;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>这样不仅保证了多线程中的安全性，同时也避免了出现调用者拿到指针进行释放的操作</p>
 <h1 id="volatile"><a href="#volatile" class="headerlink" title="volatile"></a>volatile</h1><p>总而言之，该关键字用于阻止编译器对变量的读取进行优化，比如在循环中，可能某些变量会先放到寄存器中，便于进行快速的操作，但这样就导致了如果内存中这个变量已经被修改但在这个循环中并没有观察到这个变量的话，那么就可能导致某些错误<br><em>那它可以用于多线程吗？</em><br><strong>不行</strong>，<code>volatile</code> 可用于实时观察内存中变量的变化，但它并不具有原子性，也就意味者它并不能保证修改顺序的一致性</p>
-<h2 id="Ref"><a href="#Ref" class="headerlink" title="Ref"></a>Ref</h2><ol>
+<h1 id="Ref"><a href="#Ref" class="headerlink" title="Ref"></a>Ref</h1><ol>
 <li><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/382372072">现代C++的内存模型</a></li>
 <li><a target="_blank" rel="noopener" href="https://www.cnblogs.com/ishen/p/13200838.html">内存模型与c++中的memory order - woder - 博客园</a></li>
 <li><a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=A8eCGOqgvH4&list=PLPx_x6oKUZyuNSam_dskkdEXn4MYeU84O">C++ and Beyond 2012: Herb Sutter - atomic Weapons 2 of 1</a></li>
@@ -277,7 +262,7 @@ t">
         </div>
           
         <div class="top-div">
-          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%85%B3%E4%BA%8E%E9%A1%BA%E5%BA%8F%E4%B8%80%E8%87%B4%E6%80%A7"><span class="top-box-text">关于顺序一致性</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E9%A1%BA%E5%BA%8F%E4%B8%80%E8%87%B4%E6%80%A7-Sequential-consistency-SC"><span class="top-box-text">顺序一致性 Sequential consistency (SC)</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%97%A0%E6%95%B0%E6%8D%AE%E7%AB%9E%E4%BA%89%E7%9A%84%E9%A1%BA%E5%BA%8F%E4%B8%80%E8%87%B4%E6%80%A7-SC-for-data-race-free-SC-DRF"><span class="top-box-text">无数据竞争的顺序一致性 SC for data-race-free (SC-DRF)</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#Acquire-%E5%92%8C-Release-%E6%93%8D%E4%BD%9C%E7%9A%84%E8%A7%A3%E9%87%8A"><span class="top-box-text">Acquire 和 Release 操作的解释</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#Why%EF%BC%9F"><span class="top-box-text">Why？</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%A6%82%E4%BD%95%E6%8E%A7%E5%88%B6%E6%8C%87%E4%BB%A4%E9%87%8D%E6%8E%92%EF%BC%9F"><span class="top-box-text">如何控制指令重排？</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E6%8E%A8%E8%8D%90%E4%BD%BF%E7%94%A8%E5%86%85%E5%AD%98%E5%B1%8F%E9%9A%9C%EF%BC%9F"><span class="top-box-text">为什么不推荐使用内存屏障？</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%95%B0%E6%8D%AE%E7%AB%9E%E4%BA%89"><span class="top-box-text">数据竞争</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#1-%E5%8F%AF%E8%83%BD%E5%B0%86%E4%B8%B4%E8%BF%91%E7%9A%84%E6%95%B0%E6%8D%AE%E8%A7%86%E4%B8%BA%E4%B8%80%E4%B8%AA-object-%E8%BF%9B%E8%A1%8C%E5%A4%84%E7%90%86"><span class="top-box-text">1. 可能将临近的数据视为一个 object 进行处理</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#2-%E5%AF%84%E5%AD%98%E5%99%A8%E5%86%99%E5%9B%9E%E6%95%B0%E6%8D%AE%E6%97%B6%E5%AF%BC%E8%87%B4%E7%9A%84%E6%95%B0%E6%8D%AE%E7%AB%9E%E4%BA%89"><span class="top-box-text">2. 寄存器写回数据时导致的数据竞争</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E4%B8%8D%E5%90%8C%E7%9A%84%E5%B9%B3%E5%8F%B0%E4%B8%8A%E7%9A%84%E5%A4%84%E7%90%86"><span class="top-box-text">不同的平台上的处理</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#Memory-Order"><span class="top-box-text">Memory Order</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%9E%9A%E4%B8%BE%E5%80%BC%E7%9A%84%E8%A7%A3%E9%87%8A"><span class="top-box-text">枚举值的解释</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E5%AF%B9%E4%BA%8E-Happens-before-%EF%BC%88%E5%85%88%E8%A1%8C%E5%8F%91%E7%94%9F%EF%BC%89%EF%BC%8CSynchronizes-with-%EF%BC%88%E5%90%8C%E6%AD%A5%EF%BC%89-%E4%B8%8E%E5%8F%AF%E8%A7%81%E6%80%A7%E7%9A%84%E8%A7%A3%E9%87%8A"><span class="top-box-text">对于 Happens-before （先行发生），Synchronizes-with （同步） 与可见性的解释</span></a></li></ol></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E4%BD%BF%E7%94%A8%E5%9C%BA%E6%99%AF"><span class="top-box-text">使用场景</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E4%BA%8B%E4%BB%B6%E8%AE%A1%E6%95%B0%E5%99%A8"><span class="top-box-text">事件计数器</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E6%A0%87%E5%BF%97%E4%BD%8D"><span class="top-box-text">标志位</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E5%BC%95%E7%94%A8%E8%AE%A1%E6%95%B0"><span class="top-box-text">引用计数</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E6%9B%B4%E5%AE%89%E5%85%A8%E7%9A%84%E5%8D%95%E4%BE%8B%E6%A8%A1%E5%BC%8F"><span class="top-box-text">更安全的单例模式</span></a></li></ol></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#volatile"><span class="top-box-text">volatile</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#Ref"><span class="top-box-text">Ref</span></a></li></ol></li></ol>
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%85%B3%E4%BA%8E%E9%A1%BA%E5%BA%8F%E4%B8%80%E8%87%B4%E6%80%A7"><span class="top-box-text">关于顺序一致性</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E9%A1%BA%E5%BA%8F%E4%B8%80%E8%87%B4%E6%80%A7-Sequential-consistency-SC"><span class="top-box-text">顺序一致性 Sequential consistency (SC)</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%97%A0%E6%95%B0%E6%8D%AE%E7%AB%9E%E4%BA%89%E7%9A%84%E9%A1%BA%E5%BA%8F%E4%B8%80%E8%87%B4%E6%80%A7-SC-for-data-race-free-SC-DRF"><span class="top-box-text">无数据竞争的顺序一致性 SC for data-race-free (SC-DRF)</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#Acquire-%E5%92%8C-Release-%E6%93%8D%E4%BD%9C%E7%9A%84%E8%A7%A3%E9%87%8A"><span class="top-box-text">Acquire 和 Release 操作的解释</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#Why%EF%BC%9F"><span class="top-box-text">Why？</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%A6%82%E4%BD%95%E6%8E%A7%E5%88%B6%E6%8C%87%E4%BB%A4%E9%87%8D%E6%8E%92%EF%BC%9F"><span class="top-box-text">如何控制指令重排？</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E6%8E%A8%E8%8D%90%E4%BD%BF%E7%94%A8%E5%86%85%E5%AD%98%E5%B1%8F%E9%9A%9C%EF%BC%9F"><span class="top-box-text">为什么不推荐使用内存屏障？</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%95%B0%E6%8D%AE%E7%AB%9E%E4%BA%89"><span class="top-box-text">数据竞争</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#1-%E5%8F%AF%E8%83%BD%E5%B0%86%E4%B8%B4%E8%BF%91%E7%9A%84%E6%95%B0%E6%8D%AE%E8%A7%86%E4%B8%BA%E4%B8%80%E4%B8%AA-object-%E8%BF%9B%E8%A1%8C%E5%A4%84%E7%90%86"><span class="top-box-text">1. 可能将临近的数据视为一个 object 进行处理</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#2-%E5%AF%84%E5%AD%98%E5%99%A8%E5%86%99%E5%9B%9E%E6%95%B0%E6%8D%AE%E6%97%B6%E5%AF%BC%E8%87%B4%E7%9A%84%E6%95%B0%E6%8D%AE%E7%AB%9E%E4%BA%89"><span class="top-box-text">2. 寄存器写回数据时导致的数据竞争</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E4%B8%8D%E5%90%8C%E7%9A%84%E5%B9%B3%E5%8F%B0%E4%B8%8A%E7%9A%84%E5%A4%84%E7%90%86"><span class="top-box-text">不同的平台上的处理</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#Memory-Order"><span class="top-box-text">Memory Order</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%9E%9A%E4%B8%BE%E5%80%BC%E7%9A%84%E8%A7%A3%E9%87%8A"><span class="top-box-text">枚举值的解释</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E5%AF%B9%E4%BA%8E-Happens-before-%EF%BC%88%E5%85%88%E8%A1%8C%E5%8F%91%E7%94%9F%EF%BC%89%EF%BC%8CSynchronizes-with-%EF%BC%88%E5%90%8C%E6%AD%A5%EF%BC%89-%E4%B8%8E%E5%8F%AF%E8%A7%81%E6%80%A7%E7%9A%84%E8%A7%A3%E9%87%8A"><span class="top-box-text">对于 Happens-before （先行发生），Synchronizes-with （同步） 与可见性的解释</span></a></li></ol></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E4%BD%BF%E7%94%A8%E5%9C%BA%E6%99%AF"><span class="top-box-text">使用场景</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E4%BA%8B%E4%BB%B6%E8%AE%A1%E6%95%B0%E5%99%A8"><span class="top-box-text">事件计数器</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E6%A0%87%E5%BF%97%E4%BD%8D"><span class="top-box-text">标志位</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E5%BC%95%E7%94%A8%E8%AE%A1%E6%95%B0"><span class="top-box-text">引用计数</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#%E6%9B%B4%E5%AE%89%E5%85%A8%E7%9A%84%E5%8D%95%E4%BE%8B%E6%A8%A1%E5%BC%8F"><span class="top-box-text">更安全的单例模式</span></a></li></ol></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#volatile"><span class="top-box-text">volatile</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#Ref"><span class="top-box-text">Ref</span></a></li></ol>
         </div>
           
       </div>
@@ -332,6 +317,7 @@ t">
         
         
     </div>
+    <!-- mermaid -->
     <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
     <script>
         if (window.mermaid) {
@@ -341,8 +327,8 @@ t">
                 theme: isDarkMode ? 'neutral' : 'base'
             });
         }
-
     </script>
+    <!-- diagrams -->
     <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
     <style type="text/css">
         @media (prefers-color-scheme: dark) {
@@ -360,9 +346,9 @@ t">
             display: flex;
             justify-content: center;
         }
-
     </style>
 </footer>
+
 
 </div>
 </div>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
   <head>
     
 
@@ -26,22 +26,6 @@
 对于不需要时间同步的情况来说，在程序运行前 env 中设置好 TZ 的相关参数即可，这里主要记录存在 NTP 服务情况下的处理方式
 问题？在多进程下，NTP 由另一个应用的">
 
-<!-- 
-<script src="/js/mermaid.min.js"></script>
-
-<script>
-  $(document).ready(function() {
-      var mermaid_config = {
-          startOnLoad: true,
-          theme: 'default',
-          flowchart:{
-              useMaxWidth: false,
-              htmlLabels: true
-          }                
-      }
-      mermaid.initialize(mermaid_config);
-  });
-</script> -->
 <link rel="shortcut icon" href="/favicon.ico">
 <link rel="stylesheet" href="/style/main.css">
 
@@ -240,6 +224,7 @@ __settimeofday64 --> __clock_settime64 --> sys_call_2</pre>
         
         
     </div>
+    <!-- mermaid -->
     <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
     <script>
         if (window.mermaid) {
@@ -249,8 +234,8 @@ __settimeofday64 --> __clock_settime64 --> sys_call_2</pre>
                 theme: isDarkMode ? 'neutral' : 'base'
             });
         }
-
     </script>
+    <!-- diagrams -->
     <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
     <style type="text/css">
         @media (prefers-color-scheme: dark) {
@@ -268,9 +253,9 @@ __settimeofday64 --> __clock_settime64 --> sys_call_2</pre>
             display: flex;
             justify-content: center;
         }
-
     </style>
 </footer>
+
 
 </div>
 </div>

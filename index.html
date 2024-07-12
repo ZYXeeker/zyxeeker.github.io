@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
   <head>
     
 
@@ -18,22 +18,6 @@
 <meta property="og:title" content="ZYXeeker`s blog">
 <meta property="og:description" content="ZYXeeker`s blog">
 
-<!-- 
-<script src="/js/mermaid.min.js"></script>
-
-<script>
-  $(document).ready(function() {
-      var mermaid_config = {
-          startOnLoad: true,
-          theme: 'default',
-          flowchart:{
-              useMaxWidth: false,
-              htmlLabels: true
-          }                
-      }
-      mermaid.initialize(mermaid_config);
-  });
-</script> -->
 <link rel="shortcut icon" href="/favicon.ico">
 <link rel="stylesheet" href="/style/main.css">
 
@@ -102,10 +86,10 @@
           <div class="post-abstract">
             
 			    
-源于 Herb Sutter的 “C++ and Beyond 2012: atomic Weapons” 对的一些笔记，以及对 atomic 的理解
+源于 Herb Sutter 的 “C++ and Beyond 2012: atomic Weapons” 对的一些笔记，以及对 atomic 的理解
 
 关于顺序一致性顺序一致性 Sequential consistency (SC)
-t
+
             
           </div>
       </a>
@@ -361,6 +345,7 @@ gcc -g t1.c -o t1
         
         
     </div>
+    <!-- mermaid -->
     <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
     <script>
         if (window.mermaid) {
@@ -370,8 +355,8 @@ gcc -g t1.c -o t1
                 theme: isDarkMode ? 'neutral' : 'base'
             });
         }
-
     </script>
+    <!-- diagrams -->
     <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
     <style type="text/css">
         @media (prefers-color-scheme: dark) {
@@ -389,9 +374,9 @@ gcc -g t1.c -o t1
             display: flex;
             justify-content: center;
         }
-
     </style>
 </footer>
+
 
 </div>
 </div>
