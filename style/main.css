@@ -133,6 +133,34 @@ progress {
 summary {
   display: list-item;
 }
+h1 {
+  font-size: 1.5em;
+}
+h2 {
+  font-size: 1.3em;
+}
+h3 {
+  font-size: 1.05em;
+}
+.post-content h1::before,
+.post-content h2::before,
+.post-content h3::before {
+  margin-right: 0.2rem;
+  color: #759eff;
+  font-weight: bold;
+}
+.post-content h1::before {
+  content: "#";
+  font-size: 1.5rem;
+}
+.post-content h2::before {
+  content: "##";
+  font-size: 1.3rem;
+}
+.post-content h3::before {
+  content: "###";
+  font-size: 1rem;
+}
 .hljs {
   display: block;
   overflow-x: auto;
@@ -715,9 +743,13 @@ nav {
 }
 .post-content table {
   border-collapse: collapse;
+  overflow-x: auto;
+  display: table;
+  margin: 1rem auto;
+}
+.post-content figure table {
   margin: 1rem 0;
   display: block;
-  overflow-x: auto;
 }
 .post-content tr {
   border-top: 1px solid #dfe2e5;
@@ -1121,4 +1153,18 @@ html.dark #twikoo .tk-ruser,
 html.dark .tk-footer a,
 html.dark .tk-actions a {
   color: #409eff;
+}
+pre[class*=language-] {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+pre[class*=language-] code {
+  color: #476582;
+}
+pre[class*=language-].line-numbers {
+  background: #fafafa;
+}
+:not(pre) > code[class*=language-],
+pre[class*=language-] {
+  background: none;
 }
