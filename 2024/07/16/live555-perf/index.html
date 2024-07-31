@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>LIVE555性能分析&amp;优化</title>
+<meta name="keywords" content="LIVE555性能分析&amp;优化, ZYXeeker`s blog">
+<meta name="description" content="
+版本依据Kernel-5.10.117 , live555-2020
+
+
+live555 作为一款 RTSP 开源库被广泛的应用在各种项目中间，但它并不是一个多线程库，虽然单线程应用在响应上具有一定的优势，但作为一个库融入到其他应用中时难">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="LIVE555性能分析&amp;优化">
+<meta property="og:description" content="
+版本依据Kernel-5.10.117 , live555-2020
+
+
+live555 作为一款 RTSP 开源库被广泛的应用在各种项目中间，但它并不是一个多线程库，虽然单线程应用在响应上具有一定的优势，但作为一个库融入到其他应用中时难">
+
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://blog.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://blog.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">LIVE555性能分析&amp;优化</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2024-07-16</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/Perf-Kernel-Linux/">
+              Perf, Kernel, Linux
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <blockquote>
+<p>版本依据<br><em>Kernel-5.10.117</em> , <em>live555-2020</em></p>
+</blockquote>
+<hr>
+<p><em>live555</em> 作为一款 <em>RTSP</em> 开源库被广泛的应用在各种项目中间，但它并不是一个多线程库，虽然单线程应用在响应上具有一定的优势，但作为一个库融入到其他应用中时难免会导致一些性能上的问题，因此这里使用 <em>perf</em> 做一次性能分析</p>
+<h1 id="正常分析"><a href="#正常分析" class="headerlink" title="正常分析"></a>正常分析</h1><p>使用 <em>perf</em> 记录 <em>live555MediaServer</em> 性能开销，记录拉流下的一小时数据</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">perf record -e cycles --call-graph dwarf ./live555mediaserver test.264</span><br></pre></td></tr></table></figure>
+<p>统计记录结果如下：</p>
+<embed style="width: 100%;" src="/img/perf-live555-normal-tcp.svg" />
+
+<p>从这里可以看出 <em>live555</em> 是使用的 <code>select()</code> 来实现的任务管理，其中系统调用部分中网络发送的开销占用达到了22%，而 <code>tcp_sendmsg_locked()</code> 占了最主要的部分，查看相关的源码：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">tcp_sendmsg</span><span class="params">(<span class="keyword">struct</span> sock *sk, <span class="keyword">struct</span> msghdr *msg, <span class="type">size_t</span> size)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> ret;</span><br><span class="line"></span><br><span class="line">	lock_sock(sk);</span><br><span class="line">	ret = tcp_sendmsg_locked(sk, msg, size);</span><br><span class="line">	release_sock(sk);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> ret;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="keyword">inline</span> <span class="type">void</span> <span class="title function_">lock_sock</span><span class="params">(<span class="keyword">struct</span> sock *sk)</span></span><br><span class="line">&#123;</span><br><span class="line">	lock_sock_nested(sk, <span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">lock_sock_nested</span><span class="params">(<span class="keyword">struct</span> sock *sk, <span class="type">int</span> subclass)</span></span><br><span class="line">&#123;</span><br><span class="line">	might_sleep();</span><br><span class="line">	spin_lock_bh(&amp;sk-&gt;sk_lock.slock);</span><br><span class="line">	<span class="keyword">if</span> (sk-&gt;sk_lock.owned)</span><br><span class="line">		__lock_sock(sk);</span><br><span class="line">	sk-&gt;sk_lock.owned = <span class="number">1</span>;</span><br><span class="line">	spin_unlock(&amp;sk-&gt;sk_lock.slock);</span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * The sk_lock has mutex_lock() semantics here:</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	mutex_acquire(&amp;sk-&gt;sk_lock.dep_map, subclass, <span class="number">0</span>, _RET_IP_);</span><br><span class="line">	local_bh_enable();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以得出实际的调用堆栈如下：</p>
+<pre class="mermaid">flowchart TD
+    subgraph "tcp_sendmsg()"
+        f_lock_sock("lock_sock()")
+        f_tcp_sendmsg_locked("f_tcp_sendmsg_locked()")
+        f_release_sock("release_sock()")
+        f_lock_sock --> f_tcp_sendmsg_locked
+        f_tcp_sendmsg_locked --> f_release_sock
+    end</pre>
+
+<p>不难看出，这个步骤会对对应的 <em>socket</em> 进行锁操作，同时 <code>lock_sock()</code> 中还存在一个函数 <code>local_bh_enable()</code>， 这个函数用于控制底层硬件中断，但它在 <code>tcp_sendmsg()</code> 中也有不小的占比。当然这对于单体应用来说这样确实没什么问题，但是在多业务应用中是否可以减少这部分的占比来提高性能呢？</p>
+<h1 id="优化调用的尝试"><a href="#优化调用的尝试" class="headerlink" title="优化调用的尝试"></a>优化调用的尝试</h1><h2 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h2><p><em>RTSP</em> 最终发出去的是 <em>RTP</em> 包，因此可以查看下 <em>live555</em> 最终发出 <em>RTP</em> 包的地方，不难找出和发送数据包相关的类与成员函数：</p>
+<pre class="mermaid">---
+title: RTP发包相关函数
+---
+classDiagram
+direction LR
+    class Medium  {
+        &lt;&lt;Abstract&gt;&gt;
+    }
+    class RTPInterface{
+        + setStreamSocket()
+        + addStreamSocket()
+        + removeStreamSocket()
+        + sendPacket() Boolean
+        - sendRTPorRTCPPacketOverTCP() Boolean
+        - sendDataOverTCP() Boolean
+        - class tcpStreamRecord* fTCPStreams;
+    }
+    class RTCPInstance {
+        + sendAppPacket()
+        + sendReport()
+        + sendBYE()
+        - sendBuiltPacket()
+        - OutPacketBuffer* fOutBuf
+        - RTPInterface fRTCPInterface
+    }
+    Medium <|-- RTCPInstance
+    RTCPInstance *-- RTPInterface</pre>
+
+<p>同时可以分析出发包相关的流程如下：</p>
+<pre class="mermaid">flowchart LR
+    subgraph RTPInterface
+        f_sendPacket("sendPacket()")
+        f_sendRTPorRTCPPacketOverTCP("sendRTPorRTCPPacketOverTCP()")
+        f_sendDataOverTCP("sendDataOverTCP()")
+        f_sendDataOverUDP("(send data over udp...)")
+        f_sendPacket --> f_sendDataOverUDP
+        f_sendPacket --> f_sendRTPorRTCPPacketOverTCP
+        f_sendRTPorRTCPPacketOverTCP --> f_sendDataOverTCP
+    end
+    subgraph RTCPInstance
+        f_sendAppPacket("sendAppPacket()")
+        f_sendReport("sendReport()")
+        f_sendBYE("sendBYE()")
+        f_sendBuiltPacket("sendBuiltPacket()")
+        f_sendAppPacket --> f_sendBuiltPacket
+        f_sendReport --> f_sendBuiltPacket
+        f_sendBYE --> f_sendBuiltPacket
+    end
+    f_sendBuiltPacket --> f_sendPacket</pre>
+
+<p>可以看出发包的关键位于 <code>RTPInterface::sendPacket()</code> ，这里会发出 UDP 和 TCP 对应的 <em>RTP</em> 数据包：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">Boolean <span class="title">RTPInterface::sendPacket</span><span class="params">(<span class="type">unsigned</span> <span class="type">char</span>* packet, <span class="type">unsigned</span> packetSize)</span> </span>&#123;</span><br><span class="line">  Boolean success = True; <span class="comment">// we&#x27;ll return False instead if any of the sends fail</span></span><br><span class="line">  <span class="comment">// Normal case: Send as a UDP packet:</span></span><br><span class="line">  <span class="keyword">if</span> (!fGS-&gt;<span class="built_in">output</span>(<span class="built_in">envir</span>(), packet, packetSize)) success = False;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Also, send over each of our TCP sockets:</span></span><br><span class="line">  tcpStreamRecord* nextStream;</span><br><span class="line">  <span class="keyword">for</span> (tcpStreamRecord* stream = fTCPStreams; stream != <span class="literal">NULL</span>; stream = nextStream) &#123;</span><br><span class="line">    nextStream = stream-&gt;fNext; <span class="comment">// Set this now, in case the following deletes &quot;stream&quot;:</span></span><br><span class="line">    <span class="keyword">if</span> (!<span class="built_in">sendRTPorRTCPPacketOverTCP</span>(packet, packetSize,</span><br><span class="line">				    stream-&gt;fStreamSocketNum, stream-&gt;fStreamChannelId)) &#123;</span><br><span class="line">      success = False;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> success;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>从这里不难看出 <em>live555</em> 是使用的链表来对 TCP 客户端进行管理，通过 <code>setStreamSocket()</code>，<code>addStreamSocket()</code> 和 <code>removeStreamSocket()</code> 这些接口对 <code>fTCPStreams</code> 链表进行操作。同时也不难看出，如果处于高并发的应用场景下 <em>live555</em> 的默认实现并不是一个很好的选择。这里主要分析的是 TCP 方式，所以接下来查看 <code>sendRTPorRTCPPacketOverTCP()</code> ：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">Boolean <span class="title">RTPInterface::sendRTPorRTCPPacketOverTCP</span><span class="params">(<span class="type">u_int8_t</span>* packet, <span class="type">unsigned</span> packetSize,</span></span></span><br><span class="line"><span class="params"><span class="function">						 <span class="type">int</span> socketNum, <span class="type">unsigned</span> <span class="type">char</span> streamChannelId)</span> </span>&#123;</span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> DEBUG_SEND</span></span><br><span class="line">  <span class="built_in">fprintf</span>(stderr, <span class="string">&quot;sendRTPorRTCPPacketOverTCP: %d bytes over channel %d (socket %d)\n&quot;</span>,</span><br><span class="line">	  packetSize, streamChannelId, socketNum); <span class="built_in">fflush</span>(stderr);</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">  <span class="comment">// Send a RTP/RTCP packet over TCP, using the encoding defined in RFC 2326, section 10.12:</span></span><br><span class="line">  <span class="comment">//     $&lt;streamChannelId&gt;&lt;packetSize&gt;&lt;packet&gt;</span></span><br><span class="line">  <span class="comment">// (If the initial &quot;send()&quot; of &#x27;$&lt;streamChannelId&gt;&lt;packetSize&gt;&#x27; succeeds, then we force</span></span><br><span class="line">  <span class="comment">// the subsequent &quot;send()&quot; for the &lt;packet&gt; data to succeed, even if we have to do so with</span></span><br><span class="line">  <span class="comment">// a blocking &quot;send()&quot;.)</span></span><br><span class="line">  <span class="keyword">do</span> &#123;</span><br><span class="line">    <span class="type">u_int8_t</span> framingHeader[<span class="number">4</span>];</span><br><span class="line">    framingHeader[<span class="number">0</span>] = <span class="string">&#x27;$&#x27;</span>;</span><br><span class="line">    framingHeader[<span class="number">1</span>] = streamChannelId;</span><br><span class="line">    framingHeader[<span class="number">2</span>] = (<span class="type">u_int8_t</span>) ((packetSize&amp;<span class="number">0xFF00</span>)&gt;&gt;<span class="number">8</span>);</span><br><span class="line">    framingHeader[<span class="number">3</span>] = (<span class="type">u_int8_t</span>) (packetSize&amp;<span class="number">0xFF</span>);</span><br><span class="line">    <span class="keyword">if</span> (!<span class="built_in">sendDataOverTCP</span>(socketNum, framingHeader, <span class="number">4</span>, False)) <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">if</span> (!<span class="built_in">sendDataOverTCP</span>(socketNum, packet, packetSize, True)) <span class="keyword">break</span>;</span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> DEBUG_SEND</span></span><br><span class="line">    <span class="built_in">fprintf</span>(stderr, <span class="string">&quot;sendRTPorRTCPPacketOverTCP: completed\n&quot;</span>); <span class="built_in">fflush</span>(stderr);</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">    <span class="keyword">return</span> True;</span><br><span class="line">  &#125; <span class="keyword">while</span> (<span class="number">0</span>);</span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> DEBUG_SEND</span></span><br><span class="line">  <span class="built_in">fprintf</span>(stderr, <span class="string">&quot;sendRTPorRTCPPacketOverTCP: failed! (errno %d)\n&quot;</span>, <span class="built_in">envir</span>().<span class="built_in">getErrno</span>()); <span class="built_in">fflush</span>(stderr);</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">  <span class="keyword">return</span> False;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里可以发现 <em>RTP</em> 发包还有一个前缀，用于标识数据包的相关信息。同时它并不是一次发送完成，而是分成了两步进行发送：</p>
+<ol>
+<li>首先发出包的相关数据</li>
+<li>再将帧数据发送出去</li>
+</ol>
+<p>那么这里调用的 <code>RTPInterface::sendDataOverTCP()</code> 如下：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">Boolean <span class="title">RTPInterface::sendDataOverTCP</span><span class="params">(<span class="type">int</span> socketNum, <span class="type">u_int8_t</span> <span class="type">const</span>* data, <span class="type">unsigned</span> dataSize, Boolean forceSendToSucceed)</span> </span>&#123;</span><br><span class="line">  <span class="type">int</span> sendResult = <span class="built_in">send</span>(socketNum, (<span class="type">char</span> <span class="type">const</span>*)data, dataSize, <span class="number">0</span><span class="comment">/*flags*/</span>);</span><br><span class="line">  <span class="keyword">if</span> (sendResult &lt; (<span class="type">int</span>)dataSize) &#123;</span><br><span class="line">    <span class="comment">// The TCP send() failed - at least partially.</span></span><br><span class="line"></span><br><span class="line">    <span class="type">unsigned</span> numBytesSentSoFar = sendResult &lt; <span class="number">0</span> ? <span class="number">0</span> : (<span class="type">unsigned</span>)sendResult;</span><br><span class="line">    <span class="keyword">if</span> (numBytesSentSoFar &gt; <span class="number">0</span> || (forceSendToSucceed &amp;&amp; <span class="built_in">envir</span>().<span class="built_in">getErrno</span>() == EAGAIN)) &#123;</span><br><span class="line">      <span class="comment">// The OS&#x27;s TCP send buffer has filled up (because the stream&#x27;s bitrate has exceeded</span></span><br><span class="line">      <span class="comment">// the capacity of the TCP connection!).</span></span><br><span class="line">      <span class="comment">// Force this data write to succeed, by blocking if necessary until it does:</span></span><br><span class="line">      <span class="type">unsigned</span> numBytesRemainingToSend = dataSize - numBytesSentSoFar;</span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> DEBUG_SEND</span></span><br><span class="line">      <span class="built_in">fprintf</span>(stderr, <span class="string">&quot;sendDataOverTCP: resending %d-byte send (blocking)\n&quot;</span>, numBytesRemainingToSend); <span class="built_in">fflush</span>(stderr);</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">      <span class="built_in">makeSocketBlocking</span>(socketNum, RTPINTERFACE_BLOCKING_WRITE_TIMEOUT_MS);</span><br><span class="line">      sendResult = <span class="built_in">send</span>(socketNum, (<span class="type">char</span> <span class="type">const</span>*)(&amp;data[numBytesSentSoFar]), numBytesRemainingToSend, <span class="number">0</span><span class="comment">/*flags*/</span>);</span><br><span class="line">      <span class="keyword">if</span> ((<span class="type">unsigned</span>)sendResult != numBytesRemainingToSend) &#123;</span><br><span class="line">	    <span class="comment">// The blocking &quot;send()&quot; failed, or timed out.  In either case, we assume that the</span></span><br><span class="line">        <span class="comment">// TCP connection has failed (or is &#x27;hanging&#x27; indefinitely), and we stop using it</span></span><br><span class="line">        <span class="comment">// (for both RTP and RTP).</span></span><br><span class="line">        <span class="comment">// (If we kept using the socket here, the RTP or RTCP packet write would be in an</span></span><br><span class="line">        <span class="comment">//  incomplete, inconsistent state.)</span></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> DEBUG_SEND</span></span><br><span class="line">        <span class="built_in">fprintf</span>(stderr, <span class="string">&quot;sendDataOverTCP: blocking send() failed (delivering %d bytes out of %d); closing socket %d\n&quot;</span>, sendResult, numBytesRemainingToSend, socketNum); <span class="built_in">fflush</span>(stderr);</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">        <span class="built_in">removeStreamSocket</span>(socketNum, <span class="number">0xFF</span>);</span><br><span class="line">        <span class="keyword">return</span> False;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="built_in">makeSocketNonBlocking</span>(socketNum);</span><br><span class="line"></span><br><span class="line">      <span class="keyword">return</span> True;</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (sendResult &lt; <span class="number">0</span> &amp;&amp; <span class="built_in">envir</span>().<span class="built_in">getErrno</span>() != EAGAIN) &#123;</span><br><span class="line">      <span class="comment">// Because the &quot;send()&quot; call failed, assume that the socket is now unusable, so stop</span></span><br><span class="line">      <span class="comment">// using it (for both RTP and RTCP):</span></span><br><span class="line">      <span class="built_in">removeStreamSocket</span>(socketNum, <span class="number">0xFF</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> False;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> True;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到这里的核心是调用 <code>send()</code>，而且 <em>live555</em> 在这也做了重发的逻辑，使用阻塞超时的方式继续&#x2F;重新发送剩余&#x2F;未发送成功数据。显然，如果处于高并发的情况下不利用多线程的优势这里会导致后面的客户端收到对应的延迟时间增大</p>
+<h2 id="尝试改进"><a href="#尝试改进" class="headerlink" title="尝试改进"></a>尝试改进</h2><p>考虑发送成功的情况下，<code>sendRTPorRTCPPacketOverTCP()</code> 中调用 <code>sendDataOverTCP()</code> 就出现了两次内核上下文的切换，虽然 <code>framingHeader</code> 作为的是4个字节的数组，复制到 <em>socket</em> 缓存区中的方式可能会被优化成赋值，但考虑到数据的大小以及<code>SO_SNDBUF</code>设置的大小，是否值得进行一次上下文切换？<br>在考虑成功的情况下对 <code>sendRTPorRTCPPacketOverTCP()</code> 中进行了修改，采用 <code>iovec</code> 将不连续的内存拼接在一起发送：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">Boolean <span class="title">RTPInterface::sendRTPorRTCPPacketOverTCP</span><span class="params">(<span class="type">u_int8_t</span>* packet, <span class="type">unsigned</span> packetSize,</span></span></span><br><span class="line"><span class="params"><span class="function">						 <span class="type">int</span> socketNum, <span class="type">unsigned</span> <span class="type">char</span> streamChannelId)</span> </span>&#123;</span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> DEBUG_SEND</span></span><br><span class="line">  <span class="built_in">fprintf</span>(stderr, <span class="string">&quot;sendRTPorRTCPPacketOverTCP: %d bytes over channel %d (socket %d)\n&quot;</span>,</span><br><span class="line">	  packetSize, streamChannelId, socketNum); <span class="built_in">fflush</span>(stderr);</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">  <span class="comment">// Send a RTP/RTCP packet over TCP, using the encoding defined in RFC 2326, section 10.12:</span></span><br><span class="line">  <span class="comment">//     $&lt;streamChannelId&gt;&lt;packetSize&gt;&lt;packet&gt;</span></span><br><span class="line">  <span class="comment">// (If the initial &quot;send()&quot; of &#x27;$&lt;streamChannelId&gt;&lt;packetSize&gt;&#x27; succeeds, then we force</span></span><br><span class="line">  <span class="comment">// the subsequent &quot;send()&quot; for the &lt;packet&gt; data to succeed, even if we have to do so with</span></span><br><span class="line">  <span class="comment">// a blocking &quot;send()&quot;.)</span></span><br><span class="line">  <span class="keyword">do</span> &#123;</span><br><span class="line">    <span class="type">u_int8_t</span> framingHeader[<span class="number">4</span>];</span><br><span class="line">    framingHeader[<span class="number">0</span>] = <span class="string">&#x27;$&#x27;</span>;</span><br><span class="line">    framingHeader[<span class="number">1</span>] = streamChannelId;</span><br><span class="line">    framingHeader[<span class="number">2</span>] = (<span class="type">u_int8_t</span>) ((packetSize&amp;<span class="number">0xFF00</span>)&gt;&gt;<span class="number">8</span>);</span><br><span class="line">    framingHeader[<span class="number">3</span>] = (<span class="type">u_int8_t</span>) (packetSize&amp;<span class="number">0xFF</span>);</span><br><span class="line"><span class="meta">#<span class="keyword">if</span> USE_IOV</span></span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">iovec</span> iov[<span class="number">2</span>];</span><br><span class="line">    iov[<span class="number">0</span>].iov_base     = framingHeader;</span><br><span class="line">    iov[<span class="number">0</span>].iov_len      = <span class="number">4</span>;</span><br><span class="line">    iov[<span class="number">1</span>].iov_base     = packet;</span><br><span class="line">    iov[<span class="number">1</span>].iov_len      = packetSize;</span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">writev</span>(socketNum, iov, <span class="number">2</span>) &lt;= <span class="number">0</span>) <span class="keyword">break</span>;</span><br><span class="line"><span class="meta">#<span class="keyword">else</span></span></span><br><span class="line">	<span class="keyword">if</span> (!<span class="built_in">sendDataOverTCP</span>(socketNum, framingHeader, <span class="number">4</span>, False)) <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">if</span> (!<span class="built_in">sendDataOverTCP</span>(socketNum, packet, packetSize, True)) <span class="keyword">break</span>;</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> DEBUG_SEND</span></span><br><span class="line">    <span class="built_in">fprintf</span>(stderr, <span class="string">&quot;sendRTPorRTCPPacketOverTCP: completed\n&quot;</span>); <span class="built_in">fflush</span>(stderr);</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> True;</span><br><span class="line">  &#125; <span class="keyword">while</span> (<span class="number">0</span>);</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> DEBUG_SEND</span></span><br><span class="line">  <span class="built_in">fprintf</span>(stderr, <span class="string">&quot;sendRTPorRTCPPacketOverTCP: failed! (errno %d)\n&quot;</span>, <span class="built_in">envir</span>().<span class="built_in">getErrno</span>()); <span class="built_in">fflush</span>(stderr);</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">  <span class="keyword">return</span> False;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后再次通过 <em>perf</em>  进行了记录：</p>
+<embed style="width: 100%;" src="/img/perf-live555-iovec-framehead+body.svg" />
+
+<p>可以看到总体的样本数有所下降，而且 <code>tcp_sendmsg()</code> 由前面的 <u>21.02%</u> 下降到了 <u>16.75%</u> ，而且预览并未受到影响，说明通过将非连续的内存连接在一起进行发送会在一定程度上提高系统性能。由于 <em>live555</em> 在用户层对 <em>RTP</em> 进行了分包以至于每次调用 <code>send()</code> 的时数据大小均不会超过 MTU 的 1500 限制，在 <em>MultiFramedRTPSink.cpp</em> 中可以看到分包的限制：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> RTP_PAYLOAD_MAX_SIZE</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> RTP_PAYLOAD_MAX_SIZE 1456</span></span><br><span class="line">      <span class="comment">// Default max packet size (1500, minus allowance for IP, UDP, UMTP headers)</span></span><br><span class="line">      <span class="comment">// (Also, make it a multiple of 4 bytes, just in case that matters.)</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">ifndef</span> RTP_PAYLOAD_PREFERRED_SIZE</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> RTP_PAYLOAD_PREFERRED_SIZE ((RTP_PAYLOAD_MAX_SIZE) &lt; 1000 ? (RTP_PAYLOAD_MAX_SIZE) : 1000)</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">MultiFramedRTPSink::<span class="built_in">MultiFramedRTPSink</span>(UsageEnvironment&amp; env,</span><br><span class="line">				       Groupsock* rtpGS,</span><br><span class="line">				       <span class="type">unsigned</span> <span class="type">char</span> rtpPayloadType,</span><br><span class="line">				       <span class="type">unsigned</span> rtpTimestampFrequency,</span><br><span class="line">				       <span class="type">char</span> <span class="type">const</span>* rtpPayloadFormatName,</span><br><span class="line">				       <span class="type">unsigned</span> numChannels)</span><br><span class="line">  : <span class="built_in">RTPSink</span>(env, rtpGS, rtpPayloadType, rtpTimestampFrequency,</span><br><span class="line">	    rtpPayloadFormatName, numChannels),</span><br><span class="line">    <span class="built_in">fOutBuf</span>(<span class="literal">NULL</span>), <span class="built_in">fCurFragmentationOffset</span>(<span class="number">0</span>), <span class="built_in">fPreviousFrameEndedFragmentation</span>(False),</span><br><span class="line">    <span class="built_in">fOnSendErrorFunc</span>(<span class="literal">NULL</span>), <span class="built_in">fOnSendErrorData</span>(<span class="literal">NULL</span>) &#123;</span><br><span class="line">        </span><br><span class="line">  <span class="built_in">setPacketSizes</span>((RTP_PAYLOAD_PREFERRED_SIZE), (RTP_PAYLOAD_MAX_SIZE));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>从此可以看到，包头+数据一起的总大小不会超过 1460，也就是 MSS 的最大值，但实际上可以从上面两者的比较看出，<code>ipv4_mtu()</code> 在前后两次的比例分别为 <u>0.17%</u> 和 <u>0.09%</u> ，说明其实虽然分两次发送不需要消耗 MTU 相关函数过多的时间，但是实际上一次性满足分包大小进行发送的开销更好<br>从这两次可以观察到 <code>skb_do_copy_data_nocache()</code> 这个函数在两次的结果中并没有减少比重（<u>1.75%</u> 和 <u>1.68%</u>），说明将两个数据结合成一次发送并不会减少从用户层向内核层拷贝的比重，只是减少了上下文的切换，那这个部分是否可以减少呢？</p>
+<h1 id="零拷贝的尝试"><a href="#零拷贝的尝试" class="headerlink" title="零拷贝的尝试"></a>零拷贝的尝试</h1><p>翻了下 <code>tcp_sendmsg_locked()</code> 源码会发现一个标志位 <code>zc</code>：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">tcp_sendmsg_locked</span><span class="params">(<span class="keyword">struct</span> sock *sk, <span class="keyword">struct</span> msghdr *msg, <span class="type">size_t</span> size)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">tcp_sock</span> *<span class="title">tp</span> =</span> tcp_sk(sk);</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ubuf_info</span> *<span class="title">uarg</span> =</span> <span class="literal">NULL</span>;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">sk_buff</span> *<span class="title">skb</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">sockcm_cookie</span> <span class="title">sockc</span>;</span></span><br><span class="line">	<span class="type">int</span> flags, err, copied = <span class="number">0</span>;</span><br><span class="line">	<span class="type">int</span> mss_now = <span class="number">0</span>, size_goal, copied_syn = <span class="number">0</span>;</span><br><span class="line">	<span class="type">int</span> process_backlog = <span class="number">0</span>;</span><br><span class="line">	<span class="type">bool</span> zc = <span class="literal">false</span>;</span><br><span class="line">	<span class="type">long</span> timeo;</span><br><span class="line"></span><br><span class="line">	flags = msg-&gt;msg_flags;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (flags &amp; MSG_ZEROCOPY &amp;&amp; size &amp;&amp; sock_flag(sk, SOCK_ZEROCOPY)) &#123;</span><br><span class="line">		skb = tcp_write_queue_tail(sk);</span><br><span class="line">		uarg = sock_zerocopy_realloc(sk, size, skb_zcopy(skb));</span><br><span class="line">		<span class="keyword">if</span> (!uarg) &#123;</span><br><span class="line">			err = -ENOBUFS;</span><br><span class="line">			<span class="keyword">goto</span> out_err;</span><br><span class="line">		&#125;</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>很显然，Linux 提供了用户层和内核层之间的零拷贝方式，即 <code>SOCK_ZEROCOPY</code> 和 <code>MSG_ZEROCOPY</code></p>
+<h2 id="SOCK-ZEROCOPY-和-MSG-ZEROCOPY-的使用"><a href="#SOCK-ZEROCOPY-和-MSG-ZEROCOPY-的使用" class="headerlink" title="SOCK_ZEROCOPY 和 MSG_ZEROCOPY 的使用"></a><code>SOCK_ZEROCOPY</code> 和 <code>MSG_ZEROCOPY</code> 的使用</h2><p>这部分源于谷歌的 PPT <a target="_blank" rel="noopener" href="https://datatracker.ietf.org/meeting/102/materials/slides-102-tcpm-making-tcp-fast-00"><em>Making TCP faster and cheaper for applications</em></a> ，这里大致总结下使用方式</p>
+<ol>
+<li>首先需要启用 <em>socket</em> 的 <code>SOCK_ZEROCOPY</code>，这里必须在 <code>bind()</code> 前进行设置，不能随时开启：</li>
+</ol>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">// create socket</span></span><br><span class="line"><span class="type">int</span> <span class="type">const</span> enabled = <span class="number">1</span>;</span><br><span class="line"><span class="keyword">auto</span> res = <span class="built_in">setsockopt</span>(newSocket, SOL_SOCKET, SO_ZEROCOPY, &amp;enabled, <span class="keyword">sizeof</span> enabled);</span><br><span class="line"><span class="comment">// bind</span></span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>然后使用 <code>send()</code>，<code>sendmsg()</code> 时就可以带上 <code>MSG_ZEROCOPY</code> 标识：</li>
+</ol>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="built_in">send</span>(sock, buff, <span class="number">0</span>, MSG_ZEROCOPY);</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<ol start="3">
+<li>最后需要监听 <code>socket</code> 的错误队列，来得知数据已经被硬件发送出去，可以使用 <code>poll</code> 来监听 <em>socket</em> 的 <code>POLLERR</code> 事件来减少自旋的时间：</li>
+</ol>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="keyword">do</span> &#123;</span><br><span class="line">  ret = <span class="built_in">recvmsg</span>(socket, &amp;msg, MSG_ERRQUEUE)</span><br><span class="line">&#125; <span class="keyword">while</span> (ret &lt; <span class="number">0</span> &amp;&amp; errno == EINTR);</span><br></pre></td></tr></table></figure>
+
+<h2 id="修改代码"><a href="#修改代码" class="headerlink" title="修改代码"></a>修改代码</h2><p>因此对代码可以进行修改：</p>
+<ol>
+<li><em>GroupsockHelper.cpp</em> 中的 <code>setupStreamSocket()</code> 启用 <code>SO_ZEROCOPY</code> 选项</li>
+</ol>
+  <figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">setupStreamSocket</span><span class="params">(UsageEnvironment&amp; env,</span></span></span><br><span class="line"><span class="params"><span class="function">            Port port, Boolean makeNonBlocking, Boolean setKeepAlive)</span> </span>&#123;</span><br><span class="line">  ...</span><br><span class="line">  <span class="comment">// 附加到最后启用ZEROCOPY</span></span><br><span class="line">  <span class="type">int</span> <span class="type">const</span> enabled = <span class="number">1</span>;</span><br><span class="line">  <span class="keyword">auto</span> res = <span class="built_in">setsockopt</span>(newSocket, SOL_SOCKET, SO_ZEROCOPY, &amp;enabled, <span class="keyword">sizeof</span> enabled);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;enable SO_ZEROCOPY: %d\n&quot;</span>, res);</span><br><span class="line">  <span class="keyword">return</span> newSocket;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>修改 <code>RTPInterface::sendRTPorRTCPPacketOverTCP()</code> 采用 <code>MSG_ZEROCOPY</code> 发送非连续数据：</li>
+</ol>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">Boolean <span class="title">RTPInterface::sendRTPorRTCPPacketOverTCP</span><span class="params">(<span class="type">u_int8_t</span>* packet, <span class="type">unsigned</span> packetSize,</span></span></span><br><span class="line"><span class="params"><span class="function">						 <span class="type">int</span> socketNum, <span class="type">unsigned</span> <span class="type">char</span> streamChannelId)</span> </span>&#123;</span><br><span class="line">  ...</span><br><span class="line">  <span class="keyword">do</span> &#123;</span><br><span class="line">	<span class="type">u_int8_t</span> framingHeader[<span class="number">4</span>];</span><br><span class="line">	framingHeader[<span class="number">0</span>] = <span class="string">&#x27;$&#x27;</span>;</span><br><span class="line">	framingHeader[<span class="number">1</span>] = streamChannelId;</span><br><span class="line">	framingHeader[<span class="number">2</span>] = (<span class="type">u_int8_t</span>) ((packetSize&amp;<span class="number">0xFF00</span>)&gt;&gt;<span class="number">8</span>);</span><br><span class="line">	framingHeader[<span class="number">3</span>] = (<span class="type">u_int8_t</span>) (packetSize&amp;<span class="number">0xFF</span>);</span><br><span class="line"><span class="meta">#<span class="keyword">if</span> USE_ZEROMSG</span></span><br><span class="line">    <span class="comment">// 组合包</span></span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">iovec</span> iov[<span class="number">2</span>];</span><br><span class="line">    iov[<span class="number">0</span>].iov_base     = framingHeader;</span><br><span class="line">    iov[<span class="number">0</span>].iov_len      = <span class="number">4</span>;</span><br><span class="line">    iov[<span class="number">1</span>].iov_base     = packet;</span><br><span class="line">    iov[<span class="number">1</span>].iov_len      = packetSize;</span><br><span class="line">    <span class="comment">// 标识MSG_ZEROCOPY并调用sendmsg</span></span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">msghdr</span> msg;</span><br><span class="line">    msg.msg_name = <span class="literal">NULL</span>;</span><br><span class="line">    msg.msg_namelen = <span class="number">0</span>;</span><br><span class="line">    msg.msg_iov = iov;</span><br><span class="line">    msg.msg_iovlen = <span class="number">2</span>;</span><br><span class="line">    msg.msg_control = <span class="literal">NULL</span>;</span><br><span class="line">    msg.msg_controllen = <span class="number">0</span>;</span><br><span class="line">    msg.msg_flags = MSG_ZEROCOPY;</span><br><span class="line">    <span class="built_in">sendmsg</span>(socketNum, &amp;msg, MSG_ZEROCOPY);</span><br><span class="line">    <span class="comment">// 使用poll监听错误事件</span></span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">pollfd</span> pfd;</span><br><span class="line">    pfd.fd = socketNum;</span><br><span class="line">    pfd.events = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">poll</span>(&amp;pfd, <span class="number">1</span>, <span class="number">-1</span>) != <span class="number">1</span> || pfd.revents &amp; POLLERR == <span class="number">0</span>)</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="built_in">perror</span>(<span class="string">&quot;poll error&quot;</span>);</span><br><span class="line">      <span class="keyword">return</span> False;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">msghdr</span> errMsg;</span><br><span class="line">    <span class="built_in">memset</span>(&amp;errMsg, <span class="number">0</span>, <span class="built_in">sizeof</span>(errMsg));</span><br><span class="line">    <span class="comment">// 等待错误消息, 收到消息说明数据已被发送出去</span></span><br><span class="line">    <span class="type">int</span> ret = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">do</span></span><br><span class="line">    &#123;</span><br><span class="line">      ret = <span class="built_in">recvmsg</span>(socketNum, &amp;errMsg, MSG_ERRQUEUE);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">while</span> (ret &lt; <span class="number">0</span> &amp;&amp; errno == EINTR);</span><br><span class="line"><span class="meta">#<span class="keyword">else</span></span></span><br><span class="line">	<span class="keyword">if</span> (!<span class="built_in">sendDataOverTCP</span>(socketNum, framingHeader, <span class="number">4</span>, False)) <span class="keyword">break</span>;</span><br><span class="line">	<span class="keyword">if</span> (!<span class="built_in">sendDataOverTCP</span>(socketNum, packet, packetSize, True)) <span class="keyword">break</span>;</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> DEBUG_SEND</span></span><br><span class="line">	<span class="built_in">fprintf</span>(stderr, <span class="string">&quot;sendRTPorRTCPPacketOverTCP: completed\n&quot;</span>); <span class="built_in">fflush</span>(stderr);</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> True;</span><br><span class="line">  &#125; <span class="keyword">while</span> (<span class="number">0</span>);</span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>修改后再次通过 <em>perf</em>  进行记录：<br><embed style="width: 100%;" src="/img/perf-live555-sendmsg-zc.svg" /><br>可以看到 <em>syscall</em> 的总量出现了下降，同时通过零拷贝来进行数据的发送。虽然结果看上去很美好，但客户端预览的画面并不连续，客户端每播放 1s 会出现卡顿导致效果并不如意。而且 <code>poll</code> 的使用不应该处于每次发包的函数中，此处只是为了验证可行性。如需要更好的改造应该是针对 <code>class tcpStreamRecord</code> 实现一套监听机制，但这样就需要引入多线程来进行处理。那是不是有更好的办法来解决？<br><em><strong>很不幸，还真没有</strong></em><br>虽然零拷贝有多种方案，但是可以将用户空间的内容带入内核空间并进行成功发送的方法目前只有两种：</p>
+<ol>
+<li>使用 <code>SOCK_ZEROCOPY</code> 和 <code>MSG_ZEROCOPY</code>（如上）</li>
+<li>采用 <code>PF_PACKET</code> 的 <code>socket</code> 直接将数据写入到 <code>TXRingBuffer</code> 中（对于 <em>live555</em> 来说会有巨大的修改量）</li>
+</ol>
+<p>或许你还知道通过 <code>vmsplice()</code> ， <code>splice()</code> 以及 <code>pipe</code> 来将用户空间的 <em>buffer</em> 地址传入到内核空间中进行发送：</p>
+<!-- draw.io diagram -->
+<div class="mxgraph-container">
+<div class="mxgraph" style="max-width:100%;border:1px solid transparent;" data-mxgraph="{&quot;highlight&quot;:&quot;#0000ff&quot;,&quot;lightbox&quot;:false,&quot;nav&quot;:true,&quot;resize&quot;:true,&quot;toolbar&quot;:&quot;zoom&quot;,&quot;edit&quot;:&quot;_blank&quot;,&quot;xml&quot;:&quot;&lt;mxfile host=\&quot;app.diagrams.net\&quot; agent=\&quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36\&quot; version=\&quot;24.7.6\&quot;&gt;\n  &lt;diagram name=\&quot;第 1 页\&quot; id=\&quot;nS7zkDnkPBtAz-QGdjIt\&quot;&gt;\n    &lt;mxGraphModel dx=\&quot;819\&quot; dy=\&quot;446\&quot; grid=\&quot;1\&quot; gridSize=\&quot;10\&quot; guides=\&quot;1\&quot; tooltips=\&quot;1\&quot; connect=\&quot;1\&quot; arrows=\&quot;1\&quot; fold=\&quot;1\&quot; page=\&quot;1\&quot; pageScale=\&quot;1\&quot; pageWidth=\&quot;827\&quot; pageHeight=\&quot;1169\&quot; math=\&quot;0\&quot; shadow=\&quot;0\&quot;&gt;\n      &lt;root&gt;\n        &lt;mxCell id=\&quot;0\&quot; /&gt;\n        &lt;mxCell id=\&quot;1\&quot; parent=\&quot;0\&quot; /&gt;\n        &lt;mxCell id=\&quot;XxjwluUfIII8UPUUCawT-3\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;sketch=1;hachureGap=4;jiggle=2;curveFitting=1;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;entryX=0.524;entryY=-0.049;entryDx=0;entryDy=0;entryPerimeter=0;\&quot; parent=\&quot;1\&quot; source=\&quot;XxjwluUfIII8UPUUCawT-2\&quot; target=\&quot;RXJswBnntEiO03U-f0vP-1\&quot; edge=\&quot;1\&quot;&gt;\n          &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;\n            &lt;mxPoint x=\&quot;180\&quot; y=\&quot;170\&quot; as=\&quot;targetPoint\&quot; /&gt;\n            &lt;Array as=\&quot;points\&quot;&gt;\n              &lt;mxPoint x=\&quot;90\&quot; y=\&quot;154\&quot; /&gt;\n            &lt;/Array&gt;\n          &lt;/mxGeometry&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;XxjwluUfIII8UPUUCawT-2\&quot; value=\&quot;buffer\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;sketch=1;hachureGap=4;jiggle=2;curveFitting=1;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;glass=0;shadow=0;fillColor=#d5e8d4;strokeColor=#82b366;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;30\&quot; y=\&quot;20\&quot; width=\&quot;120\&quot; height=\&quot;30\&quot; as=\&quot;geometry\&quot; /&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;XxjwluUfIII8UPUUCawT-6\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;sketch=1;hachureGap=4;jiggle=2;curveFitting=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;\&quot; parent=\&quot;1\&quot; source=\&quot;XxjwluUfIII8UPUUCawT-4\&quot; target=\&quot;XxjwluUfIII8UPUUCawT-5\&quot; edge=\&quot;1\&quot;&gt;\n          &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot; /&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;XxjwluUfIII8UPUUCawT-7\&quot; value=\&quot;DMA Copy\&quot; style=\&quot;edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];sketch=1;hachureGap=4;jiggle=2;curveFitting=1;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;\&quot; parent=\&quot;XxjwluUfIII8UPUUCawT-6\&quot; vertex=\&quot;1\&quot; connectable=\&quot;0\&quot;&gt;\n          &lt;mxGeometry x=\&quot;0.1219\&quot; y=\&quot;-1\&quot; relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;\n            &lt;mxPoint x=\&quot;1\&quot; y=\&quot;-9\&quot; as=\&quot;offset\&quot; /&gt;\n          &lt;/mxGeometry&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;XxjwluUfIII8UPUUCawT-4\&quot; value=\&quot;socket buffer\&quot; style=\&quot;rounded=1;whiteSpace=wrap;html=1;sketch=1;hachureGap=4;jiggle=2;curveFitting=1;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;fillColor=#e1d5e7;strokeColor=#9673a6;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;110\&quot; y=\&quot;190\&quot; width=\&quot;120\&quot; height=\&quot;30\&quot; as=\&quot;geometry\&quot; /&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;XxjwluUfIII8UPUUCawT-5\&quot; value=\&quot;网卡\&quot; style=\&quot;rounded=0;whiteSpace=wrap;html=1;hachureGap=4;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;fillColor=#dae8fc;strokeColor=#6c8ebf;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;110\&quot; y=\&quot;290\&quot; width=\&quot;120\&quot; height=\&quot;30\&quot; as=\&quot;geometry\&quot; /&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;XxjwluUfIII8UPUUCawT-10\&quot; value=\&quot;\&quot; style=\&quot;endArrow=none;dashed=1;html=1;rounded=0;hachureGap=4;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;strokeColor=default;\&quot; parent=\&quot;1\&quot; edge=\&quot;1\&quot;&gt;\n          &lt;mxGeometry width=\&quot;50\&quot; height=\&quot;50\&quot; relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;\n            &lt;mxPoint x=\&quot;20\&quot; y=\&quot;120\&quot; as=\&quot;sourcePoint\&quot; /&gt;\n            &lt;mxPoint x=\&quot;360\&quot; y=\&quot;120\&quot; as=\&quot;targetPoint\&quot; /&gt;\n          &lt;/mxGeometry&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;XxjwluUfIII8UPUUCawT-11\&quot; value=\&quot;\&quot; style=\&quot;endArrow=none;dashed=1;html=1;rounded=0;hachureGap=4;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;strokeColor=default;\&quot; parent=\&quot;1\&quot; edge=\&quot;1\&quot;&gt;\n          &lt;mxGeometry width=\&quot;50\&quot; height=\&quot;50\&quot; relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;\n            &lt;mxPoint x=\&quot;20\&quot; y=\&quot;265\&quot; as=\&quot;sourcePoint\&quot; /&gt;\n            &lt;mxPoint x=\&quot;360\&quot; y=\&quot;264.71\&quot; as=\&quot;targetPoint\&quot; /&gt;\n          &lt;/mxGeometry&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;XxjwluUfIII8UPUUCawT-12\&quot; value=\&quot;User Space\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;280\&quot; y=\&quot;88\&quot; width=\&quot;90\&quot; height=\&quot;30\&quot; as=\&quot;geometry\&quot; /&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;XxjwluUfIII8UPUUCawT-13\&quot; value=\&quot;Kernel Space\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;275\&quot; y=\&quot;230\&quot; width=\&quot;100\&quot; height=\&quot;30\&quot; as=\&quot;geometry\&quot; /&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;XxjwluUfIII8UPUUCawT-14\&quot; value=\&quot;HW\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;\&quot; parent=\&quot;1\&quot; vertex=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;305\&quot; y=\&quot;290\&quot; width=\&quot;40\&quot; height=\&quot;30\&quot; as=\&quot;geometry\&quot; /&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;RXJswBnntEiO03U-f0vP-4\&quot; style=\&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;sketch=1;hachureGap=4;jiggle=2;curveFitting=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;\&quot; edge=\&quot;1\&quot; parent=\&quot;1\&quot; source=\&quot;RXJswBnntEiO03U-f0vP-1\&quot; target=\&quot;XxjwluUfIII8UPUUCawT-4\&quot;&gt;\n          &lt;mxGeometry relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;\n            &lt;Array as=\&quot;points\&quot;&gt;\n              &lt;mxPoint x=\&quot;260\&quot; y=\&quot;155\&quot; /&gt;\n              &lt;mxPoint x=\&quot;260\&quot; y=\&quot;205\&quot; /&gt;\n            &lt;/Array&gt;\n          &lt;/mxGeometry&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;RXJswBnntEiO03U-f0vP-1\&quot; value=\&quot;pipe\&quot; style=\&quot;shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;sketch=1;hachureGap=4;jiggle=2;curveFitting=1;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;direction=north;fillColor=#f8cecc;strokeColor=#b85450;\&quot; vertex=\&quot;1\&quot; parent=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;130\&quot; y=\&quot;140\&quot; width=\&quot;90\&quot; height=\&quot;30\&quot; as=\&quot;geometry\&quot; /&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;RXJswBnntEiO03U-f0vP-6\&quot; value=\&quot;\&quot; style=\&quot;shape=flexArrow;endArrow=classic;html=1;rounded=0;sketch=1;hachureGap=4;jiggle=2;curveFitting=1;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;width=5.555555555555555;endSize=5.575;endWidth=12.901234567901234;\&quot; edge=\&quot;1\&quot; parent=\&quot;1\&quot;&gt;\n          &lt;mxGeometry width=\&quot;50\&quot; height=\&quot;50\&quot; relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;\n            &lt;mxPoint x=\&quot;210\&quot; y=\&quot;88\&quot; as=\&quot;sourcePoint\&quot; /&gt;\n            &lt;mxPoint x=\&quot;110\&quot; y=\&quot;88\&quot; as=\&quot;targetPoint\&quot; /&gt;\n          &lt;/mxGeometry&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;RXJswBnntEiO03U-f0vP-7\&quot; value=\&quot;\&quot; style=\&quot;shape=flexArrow;endArrow=classic;html=1;rounded=0;sketch=1;hachureGap=4;jiggle=2;curveFitting=1;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;width=5.555555555555555;endSize=5.575;endWidth=12.901234567901234;\&quot; edge=\&quot;1\&quot; parent=\&quot;1\&quot;&gt;\n          &lt;mxGeometry width=\&quot;50\&quot; height=\&quot;50\&quot; relative=\&quot;1\&quot; as=\&quot;geometry\&quot;&gt;\n            &lt;mxPoint x=\&quot;259.71\&quot; y=\&quot;58\&quot; as=\&quot;sourcePoint\&quot; /&gt;\n            &lt;mxPoint x=\&quot;259.71\&quot; y=\&quot;148\&quot; as=\&quot;targetPoint\&quot; /&gt;\n          &lt;/mxGeometry&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;RXJswBnntEiO03U-f0vP-8\&quot; value=\&quot;splice()\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;\&quot; vertex=\&quot;1\&quot; parent=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;230\&quot; y=\&quot;28\&quot; width=\&quot;60\&quot; height=\&quot;30\&quot; as=\&quot;geometry\&quot; /&gt;\n        &lt;/mxCell&gt;\n        &lt;mxCell id=\&quot;RXJswBnntEiO03U-f0vP-9\&quot; value=\&quot;vmsplice()\&quot; style=\&quot;text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;\&quot; vertex=\&quot;1\&quot; parent=\&quot;1\&quot;&gt;\n          &lt;mxGeometry x=\&quot;130\&quot; y=\&quot;58\&quot; width=\&quot;80\&quot; height=\&quot;30\&quot; as=\&quot;geometry\&quot; /&gt;\n        &lt;/mxCell&gt;\n      &lt;/root&gt;\n    &lt;/mxGraphModel&gt;\n  &lt;/diagram&gt;\n&lt;/mxfile&gt;\n&quot;}"></div>
+</div>
+
+<p>但是很可惜，虽然这样做到了零拷贝，但是 <code>splice()</code> 返回的数据长度总和可能等于两个包的大小，但是这个包不一定被硬件发送了出去，总而言之，使用这个方法 <code>splice()</code> 并<strong>不知道数据是否已经被送出去</strong>，以至于没法确定重用 <em>buffer</em> 的时机，这也就导致了接收端收到错误的数据</p>
+<h2 id="总结-1"><a href="#总结-1" class="headerlink" title="总结"></a>总结</h2><p>综上，虽然使用 <code>SOCK_ZEROCOPY</code> 和 <code>MSG_ZEROCOPY</code> 取得了一定的效果，但是需要对源码进行大幅度的修改才能达到更好的效果</p>
+<h1 id="Ref"><a href="#Ref" class="headerlink" title="Ref"></a>Ref</h1><p><a target="_blank" rel="noopener" href="https://yarchive.net/comp/linux/splice.html">splice() (Linus Torvalds)</a><br><a target="_blank" rel="noopener" href="https://ogris.de/howtos/splice.html">splice() on Linux</a><br><a target="_blank" rel="noopener" href="https://lwn.net/Articles/923237/">Rethinking splice() [LWN.net]</a><br><a target="_blank" rel="noopener" href="https://netdevconf.org/2.1/papers/netdev.pdf">netdevconf.org&#x2F;2.1&#x2F;papers&#x2F;netdev.pdf</a><br><a target="_blank" rel="noopener" href="https://datatracker.ietf.org/meeting/102/materials/slides-102-tcpm-making-tcp-fast-00">datatracker.ietf.org&#x2F;meeting&#x2F;102&#x2F;materials&#x2F;slides-102-tcpm-making-tcp-fast-00</a></p>
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%AD%A3%E5%B8%B8%E5%88%86%E6%9E%90"><span class="top-box-text">正常分析</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E4%BC%98%E5%8C%96%E8%B0%83%E7%94%A8%E7%9A%84%E5%B0%9D%E8%AF%95"><span class="top-box-text">优化调用的尝试</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="top-box-text">源码分析</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%B0%9D%E8%AF%95%E6%94%B9%E8%BF%9B"><span class="top-box-text">尝试改进</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%80%BB%E7%BB%93"><span class="top-box-text">总结</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E9%9B%B6%E6%8B%B7%E8%B4%9D%E7%9A%84%E5%B0%9D%E8%AF%95"><span class="top-box-text">零拷贝的尝试</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#SOCK-ZEROCOPY-%E5%92%8C-MSG-ZEROCOPY-%E7%9A%84%E4%BD%BF%E7%94%A8"><span class="top-box-text">SOCK_ZEROCOPY 和 MSG_ZEROCOPY 的使用</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E4%BF%AE%E6%94%B9%E4%BB%A3%E7%A0%81"><span class="top-box-text">修改代码</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%80%BB%E7%BB%93-1"><span class="top-box-text">总结</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#Ref"><span class="top-box-text">Ref</span></a></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2024/07/08/atomic-weapon/">
+          <h3 class="post-title">
+            下一篇：Atomic Weapons 笔记
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+
+
+
+
+
+
+
+
+<footer>
+    <div class="site-footer">
+        <div class="social-container">
+            
+            
+            <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
+                <i class="icon icon-github"></i>
+            </a>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+        </div>
+        
+        Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a
+            href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+        
+        
+        
+        
+        
+        
+    </div>
+    <!-- mermaid -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            // 检查用户的首选颜色模式
+            const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            mermaid.initialize({
+                theme: isDarkMode ? 'neutral' : 'base'
+            });
+        }
+    </script>
+    <!-- diagrams -->
+    <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+    <style type="text/css">
+        @media (prefers-color-scheme: dark) {
+            svg {
+                filter: invert(93%) hue-rotate(180deg);
+                background-color: transparent !important;
+            }
+
+            image {
+                filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+            }
+        }
+
+        .mxgraph-container {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</footer>
+
+
+</div>
+</div>
+
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+</body>
+
+</html>
+
