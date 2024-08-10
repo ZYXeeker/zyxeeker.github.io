@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>C++中数据转换设计 —— 对接 Json 转换</title>
+<meta name="keywords" content="C++中数据转换设计 —— 对接 Json 转换, ZYXeeker`s blog">
+<meta name="description" content="
+Json 库：NlohmannJson 可以根据实际情况进行修改
+
+前言在很多场景中，使用 Json 作为配置保存和数据传输是一个很好的选择，比如 ProtoBuf3 就自带了两者之间的转换。同时这个方式能有效的解决前面所提到的数据类型不">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="C++中数据转换设计 —— 对接 Json 转换">
+<meta property="og:description" content="
+Json 库：NlohmannJson 可以根据实际情况进行修改
+
+前言在很多场景中，使用 Json 作为配置保存和数据传输是一个很好的选择，比如 ProtoBuf3 就自带了两者之间的转换。同时这个方式能有效的解决前面所提到的数据类型不">
+
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://blog.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://blog.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">C++中数据转换设计 —— 对接 Json 转换</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2024-08-09</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/C/">
+              C++
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <blockquote>
+<p><em>Json</em> 库：<em>NlohmannJson</em> 可以根据实际情况进行修改</p>
+</blockquote>
+<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>在很多场景中，使用 <em>Json</em> 作为配置保存和数据传输是一个很好的选择，比如 <em>ProtoBuf3</em> 就自带了两者之间的转换。同时这个方式能有效的解决前面所提到的数据类型不一致导致业务逻辑异常的问题</p>
+<h1 id="接口-实现"><a href="#接口-实现" class="headerlink" title="接口&amp;实现"></a>接口&amp;实现</h1><h2 id="内部转换接口设计-实现"><a href="#内部转换接口设计-实现" class="headerlink" title="内部转换接口设计&amp;实现"></a>内部转换接口设计&amp;实现</h2><p>原理和<a href="/2024/08/08/struct-cvt-reflection/" title="C++中数据转换设计 —— 实现反射">前文</a>一样，也是为需要的结构体定义属性，然后循环进行转换。因此，需要和二进制数据转换一样需要定义两个正反转换的接口：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">namespace</span> _impl &#123;</span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 序列化至Json数据核心类</span></span><br><span class="line"><span class="comment"> * @tparam T 源类型</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">ToJson</span> &#123;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">operator</span><span class="params">()</span><span class="params">(nlohmann::json&amp; json, <span class="type">const</span> T&amp; value)</span></span>;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 反序列化Json数据核心类</span></span><br><span class="line"><span class="comment"> * @tparam T 目标类型</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">FromJson</span> &#123;</span><br><span class="line">  <span class="function"><span class="type">bool</span> <span class="title">operator</span><span class="params">()</span><span class="params">(T&amp; val, <span class="type">const</span> nlohmann::json&amp; json)</span></span>;</span><br><span class="line">&#125;;</span><br><span class="line">&#125; <span class="comment">// _impl</span></span><br></pre></td></tr></table></figure>
+
+<p>相对于二进制数据转换来说只需要完善对 <code>vector</code> 支持即可，为什么？因为 <code>struct</code> 对于 <em>Json</em> 来说可以视为一个 <em>Object</em> ，所以对于这种字典结构来说只针对数组进行处理是可行的<br>那 <em>Json</em> 的数组中存放着不同类型的数据该如何支持？说实话，这种情况是很少见的，因为这样对于对接采用这样数据定义接口的用户来说是一个非常糟糕的方式，所以通常情况下是同一种类型<br>综上，对 <code>vector</code> 和基本类型的转换实现如下：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">namespace</span> _impl &#123;</span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 序列化至Json数据核心类</span></span><br><span class="line"><span class="comment"> * @tparam T 源类型</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">ToJson</span> &#123;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">operator</span><span class="params">()</span><span class="params">(nlohmann::json&amp; json, <span class="type">const</span> T&amp; value)</span> </span>&#123;</span><br><span class="line">    json = value;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// vector偏特化</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">ToJson</span>&lt;std::vector&lt;T&gt; &gt; &#123;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">operator</span><span class="params">()</span><span class="params">(nlohmann::json&amp; json, <span class="type">const</span> std::vector&lt;T&gt;&amp; value)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">const</span> <span class="keyword">auto</span>&amp; i : value) &#123;</span><br><span class="line">      nlohmann::json _json;</span><br><span class="line">      <span class="built_in">ToJson</span>&lt;T&gt;()(_json, i);</span><br><span class="line">      json.<span class="built_in">push_back</span>(_json);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 反序列化Json数据核心类</span></span><br><span class="line"><span class="comment"> * @tparam T 目标类型</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">FromJson</span> &#123;</span><br><span class="line">  <span class="function"><span class="type">bool</span> <span class="title">operator</span><span class="params">()</span><span class="params">(T&amp; val, <span class="type">const</span> nlohmann::json&amp; json)</span> </span>&#123;</span><br><span class="line">    val = json.<span class="built_in">get</span>&lt;T&gt;();</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// vector偏特化</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">FromJson</span>&lt;std::vector&lt;T&gt; &gt; &#123;</span><br><span class="line">  <span class="function"><span class="type">bool</span> <span class="title">operator</span><span class="params">()</span><span class="params">(std::vector&lt;T&gt;&amp; val, <span class="type">const</span> nlohmann::json&amp; json)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!json.<span class="built_in">is_array</span>()) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">const</span> <span class="keyword">auto</span>&amp; i : json) &#123;</span><br><span class="line">      T _val;</span><br><span class="line">      <span class="keyword">if</span> (!<span class="built_in">FromJson</span>&lt;T&gt;()(_val, i)) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">      &#125;</span><br><span class="line">      val.<span class="built_in">push_back</span>(_val);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line">&#125; <span class="comment">// _impl</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="用户接口设计-实现"><a href="#用户接口设计-实现" class="headerlink" title="用户接口设计&amp;实现"></a>用户接口设计&amp;实现</h2><p>提供给用户调用的接口可以设计为：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Json</span> &#123;</span><br><span class="line">  <span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function">  <span class="type">static</span> <span class="type">void</span> <span class="title">Serialized</span><span class="params">(nlohmann::json&amp; json, <span class="type">const</span> T&amp; value)</span></span>;</span><br><span class="line">  <span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function">  <span class="type">static</span> <span class="type">bool</span> <span class="title">Deserialized</span><span class="params">(T&amp; value, <span class="type">const</span> nlohmann::json&amp; json)</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>具体实现和 <code>Binary</code> 部分类似，只是这里对 <code>Json</code> 库转换的异常做了拦截返回，因为有可能在某些项目中不会使用异常捕获来进行处理，所以这里可以按需进行修改：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Json</span> &#123;</span><br><span class="line">  <span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function">  <span class="type">static</span> <span class="type">void</span> <span class="title">Serialized</span><span class="params">(nlohmann::json&amp; json, <span class="type">const</span> T&amp; value)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 遍历属性中的成员数据, 按照顺序进行转换</span></span><br><span class="line">    <span class="built_in">PropertyForeach</span>(T::__Property, [&amp;](<span class="keyword">auto</span> elem) &#123;</span><br><span class="line">      nlohmann::json json_value;</span><br><span class="line">      _impl::<span class="built_in">ToJson</span>&lt;<span class="keyword">typename</span> <span class="keyword">decltype</span>(elem)::Type&gt;()(json_value, value.*(elem.Member));</span><br><span class="line">      json[elem.Name] = json_value;</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function">  <span class="type">static</span> <span class="type">bool</span> <span class="title">Deserialized</span><span class="params">(T&amp; value, <span class="type">const</span> nlohmann::json&amp; json)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">      <span class="comment">// 遍历属性中的成员数据, 按照顺序进行转换</span></span><br><span class="line">      <span class="built_in">PropertyForeach</span>(T::__Property, [&amp;](<span class="keyword">auto</span> elem) &#123;</span><br><span class="line">        <span class="keyword">using</span> ValueType = <span class="keyword">typename</span> <span class="keyword">decltype</span>(elem)::Type;</span><br><span class="line">        <span class="keyword">auto</span> res = json.<span class="built_in">find</span>(elem.Name);</span><br><span class="line">        <span class="keyword">if</span> (res == json.<span class="built_in">end</span>()) &#123;</span><br><span class="line">          value.*(elem.Member) = ValueType &#123;&#125;;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">          _impl::<span class="built_in">FromJson</span>&lt;ValueType&gt;()(value.*(elem.Member), *res);</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">catch</span> (...) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h2 id="更进一步？"><a href="#更进一步？" class="headerlink" title="更进一步？"></a>更进一步？</h2><p><em>Json</em> 提供了很好的可读性，因此可以增加一个接口用于转换成字符串：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Json</span> &#123;</span><br><span class="line">  ...</span><br><span class="line">  <span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function">  <span class="type">static</span> std::string <span class="title">ToString</span><span class="params">(T&amp; value)</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>在有了转换的接口和第三方库提供了 <code>to_string</code> 的接口基础上就不难实现了：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="function"><span class="type">static</span> std::string <span class="title">ToString</span><span class="params">(<span class="type">const</span> T&amp; value)</span> </span>&#123;</span><br><span class="line">  nlohmann::json json;</span><br><span class="line">  <span class="built_in">Serialized</span>(json, value);</span><br><span class="line">  <span class="keyword">return</span> nlohmann::<span class="built_in">to_string</span>(json);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h1 id="测试"><a href="#测试" class="headerlink" title="测试"></a>测试</h1><p>还是和前文一样进行互相转换测试，但由于字符串互转在不同的场景下 KV 顺序并不是一定的，所以需要自身去判断下</p>
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%89%8D%E8%A8%80"><span class="top-box-text">前言</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%8E%A5%E5%8F%A3-%E5%AE%9E%E7%8E%B0"><span class="top-box-text">接口&amp;实现</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%86%85%E9%83%A8%E8%BD%AC%E6%8D%A2%E6%8E%A5%E5%8F%A3%E8%AE%BE%E8%AE%A1-%E5%AE%9E%E7%8E%B0"><span class="top-box-text">内部转换接口设计&amp;实现</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E7%94%A8%E6%88%B7%E6%8E%A5%E5%8F%A3%E8%AE%BE%E8%AE%A1-%E5%AE%9E%E7%8E%B0"><span class="top-box-text">用户接口设计&amp;实现</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%9B%B4%E8%BF%9B%E4%B8%80%E6%AD%A5%EF%BC%9F"><span class="top-box-text">更进一步？</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%B5%8B%E8%AF%95"><span class="top-box-text">测试</span></a></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2024/08/08/struct-cvt-reflection/">
+          <h3 class="post-title">
+            下一篇：C++中数据转换设计 —— 实现反射
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+
+
+
+
+
+
+
+
+<footer>
+    <div class="site-footer">
+        <div class="social-container">
+            
+            
+            <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
+                <i class="icon icon-github"></i>
+            </a>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+        </div>
+        
+        Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a
+            href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+        
+        
+        
+        
+        
+        
+    </div>
+    <!-- mermaid -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            // 检查用户的首选颜色模式
+            const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            mermaid.initialize({
+                theme: isDarkMode ? 'neutral' : 'base'
+            });
+        }
+    </script>
+    <!-- diagrams -->
+    <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+    <style type="text/css">
+        @media (prefers-color-scheme: dark) {
+            svg {
+                filter: invert(93%) hue-rotate(180deg);
+                background-color: transparent !important;
+            }
+
+            image {
+                filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+            }
+        }
+
+        .mxgraph-container {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</footer>
+
+
+</div>
+</div>
+
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+</body>
+
+</html>
+

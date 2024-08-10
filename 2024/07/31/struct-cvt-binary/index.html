@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>C++中数据转换设计 —— 二进制数据转换</title>
+<meta name="keywords" content="C++中数据转换设计 —— 二进制数据转换, ZYXeeker`s blog">
+<meta name="description" content="前言在之前的项目架构中对应用功能进行了分离调整，并使用了 IPC 来处理进程间的交互，虽然是嵌入式设备但是在空间性能足够的情况下采用了 ProtoBuf 来对数据进行解析传递。但到了后面的项目中我发现其他同事采用的数据结构为 Json ，毕">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="C++中数据转换设计 —— 二进制数据转换">
+<meta property="og:description" content="前言在之前的项目架构中对应用功能进行了分离调整，并使用了 IPC 来处理进程间的交互，虽然是嵌入式设备但是在空间性能足够的情况下采用了 ProtoBuf 来对数据进行解析传递。但到了后面的项目中我发现其他同事采用的数据结构为 Json ，毕">
+
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://blog.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://blog.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">C++中数据转换设计 —— 二进制数据转换</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2024-07-31</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/C/">
+              C++
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>在之前的项目架构中对应用功能进行了分离调整，并使用了 IPC 来处理进程间的交互，虽然是嵌入式设备但是在空间性能足够的情况下采用了 <em>ProtoBuf</em> 来对数据进行解析传递。但到了后面的项目中我发现其他同事采用的数据结构为 <em>Json</em> ，毕竟当时我只提供了一个 IPC 中间件来作为各个应用交互的节点，其他的数据解析则需要根据不同的情况来进行解析处理，因此应用间数据传输的流程如下：</p>
+<pre class="mermaid">flowchart TB
+    subgraph App1
+        direction TB
+        buffer1("JSON Object")
+        data1("JSON data")
+        parser1("JSON serialize/deserialize")
+        buffer1 <--> parser1 <--> data1
+    end
+    subgraph App2
+        direction TB
+        buffer2("JSON Object")
+        data2("JSON data")
+        parser2("JSON serialize/deserialize")
+        buffer2 <--> parser2 <--> data2
+    end
+    ipc[[ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IPC&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ]]
+    data1 <--> ipc
+    data2 <--> ipc</pre>
+
+<p>先不说 <em>Json</em> 带来的数据类型转换<a href="/2024/05/24/cfg-cvt/" title="C++中配置转换设计">问题</a>，就作为应用间数据传递的话有几点疑惑：</p>
+<ul>
+<li>在 IPC 中我们是否需要传递 <em>Key</em> 值？毕竟用于 IPC 基本上是具有确定的 <em>Key</em> </li>
+<li>我们是否需要这么大的数据进行传输？当 KV 变多了，<em>Json</em> 紧缩后得到的字符串的长度可能远远大于预期</li>
+<li>每次进行序列&#x2F;反序列化是否值得？<em>Json</em> 中 KV 是乱序，不一定按照指定的顺序进行排列<br>总而言之，使用 <em>Json</em> 用于 IPC 进行数据转换和传输并不值得，需要一套更加紧凑的二进制数据和转换更加高效的方式来满足需求</li>
+</ul>
+<h2 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h2><p>完整代码与测试单元：</p>
+<ul>
+<li>代码：<a target="_blank" rel="noopener" href="https://github.com/zyxeeker/tools/blob/main/include/cvt.hpp">tools&#x2F;include&#x2F;cvt.hpp at main · zyxeeker&#x2F;tools · GitHub</a></li>
+<li>测试用例：<a target="_blank" rel="noopener" href="https://github.com/zyxeeker/tools/blob/main/tests/test_cvt.cpp">tools&#x2F;tests&#x2F;test_cvt.cpp at main · zyxeeker&#x2F;tools · GitHub</a></li>
+</ul>
+<h1 id="设计目标"><a href="#设计目标" class="headerlink" title="设计目标"></a>设计目标</h1><p>针对数据传输最通用的方式是设计一个结构体，发送方依次拷贝结构体成员中的内容到指定内存空间中并发送出去，接收方通过同样的结构体将得到的数据进行对应的解析转换。这在 C 中是很常见的做法，但使用的是 C++，所以我希望能做到：</p>
+<ol>
+<li>直接对接对应的容器比如 <code>vector</code> 和 <code>string</code></li>
+<li>实现 <em>Binary</em>，<em>struct</em>，<em>Json</em> 三者的互转</li>
+</ol>
+<h1 id="转换设计-实现"><a href="#转换设计-实现" class="headerlink" title="转换设计&amp;实现"></a>转换设计&amp;实现</h1><h2 id="类型转换"><a href="#类型转换" class="headerlink" title="类型转换"></a>类型转换</h2><p>对于整型，浮点以及布尔来说，直接按大小进行拷贝即可。而对于 <code>vector</code> 和 <code>string</code> 来说，本质上是个数组，所以可以按照常规数组设计即可：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">// Array structure</span></span><br><span class="line"><span class="comment">// +----------------+---------------------------------------------+</span></span><br><span class="line"><span class="comment">// | size (4 bytes) |    data (size * (element`s size) bytes)     |</span></span><br><span class="line"><span class="comment">// +----------------+---------------------------------------------+</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="转换接口设计"><a href="#转换接口设计" class="headerlink" title="转换接口设计"></a>转换接口设计</h2><p>既然是 C++ ，那么可以使用 <code>vector</code> 来作为目标 <em>buffer</em> ，同时可以使用模板来对数组和字符串进行对应转换。那么需要设计两个正反转换的模板类：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 使用vector作为buffer</span></span><br><span class="line"><span class="keyword">using</span> Buffer = std::vector&lt;<span class="type">uint8_t</span>&gt;;</span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 反序列化的核心类</span></span><br><span class="line"><span class="comment"> * @tparam T 目标类型</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">FromBuffer</span> &#123;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 重载()用于转换返回</span></span><br><span class="line"><span class="comment">   * @param dst 目标地址 </span></span><br><span class="line"><span class="comment">   * @param buff 待转换的buffer空间 </span></span><br><span class="line"><span class="comment">   * @param offset buffer指针偏移量 </span></span><br><span class="line"><span class="comment">   * @return 正常返回已处理字节数, 异常时返回 -1</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">int</span> <span class="title">operator</span><span class="params">()</span><span class="params">(T&amp; dst, <span class="type">const</span> Buffer&amp; buff, <span class="type">off_t</span> offset)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 序列化核心类</span></span><br><span class="line"><span class="comment"> * @tparam T 源类型</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">ToBuffer</span> &#123;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 重载()用于转换返回</span></span><br><span class="line"><span class="comment">   * @param dst 目标buffer</span></span><br><span class="line"><span class="comment">   * @param src 源类型</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">operator</span><span class="params">()</span><span class="params">(Buffer&amp; buffer, <span class="type">const</span> T&amp; src)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h2 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h2><h3 id="FromBuffer-的实现"><a href="#FromBuffer-的实现" class="headerlink" title="FromBuffer 的实现"></a><code>FromBuffer</code> 的实现</h3><p>对于普通的类型来说直接使用拷贝的方式进行实现，其中 <code>offset</code> 需要考虑 <code>buff</code> 边界问题：</p>
+<ol>
+<li>当 <code>offset</code> 超出 <code>buf</code> 长度时，需要返回异常</li>
+<li>当 <code>offset</code> 与参数类型大小相加后超出 <code>buf</code> 长度时，需要返回异常</li>
+<li>当 <code>offset</code> 等于 <code>buf</code> 长度时，这时候没有需要处理的数据则对目标的元素进行默认赋值</li>
+</ol>
+<p>因此不难实现：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 反序列化的核心类</span></span><br><span class="line"><span class="comment"> * @tparam T 目标类型</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">FromBuffer</span> &#123;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 重载()用于转换返回</span></span><br><span class="line"><span class="comment">   * @param dst 目标地址</span></span><br><span class="line"><span class="comment">   * @param buff 待转换的buffer空间</span></span><br><span class="line"><span class="comment">   * @param offset buffer指针偏移量</span></span><br><span class="line"><span class="comment">   * @return 正常返回已处理字节数, 异常时返回 -1</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">int</span> <span class="title">operator</span><span class="params">()</span><span class="params">(T&amp; dst, <span class="type">const</span> Buffer&amp; buff, <span class="type">off_t</span> offset)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (offset &gt; buff.<span class="built_in">size</span>() || offset + <span class="built_in">sizeof</span>(T) &gt; buff.<span class="built_in">size</span>()) <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    <span class="keyword">if</span> (offset == buff.<span class="built_in">size</span>()) &#123;</span><br><span class="line">      dst = std::<span class="built_in">move</span>(T&#123;&#125;);</span><br><span class="line">      <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">memcpy</span>(&amp;dst, buff.<span class="built_in">data</span>() + offset, <span class="built_in">sizeof</span>(T));</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">sizeof</span>(T);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>针对于 <code>vector</code> 和 <code>string</code> 来说需要 <em>偏特化</em> 来进行实现，这两者的本质结构即数组，因此使用最常用的格式进行实现：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">// Array structure</span></span><br><span class="line"><span class="comment">// +----------------+---------------------------------------------+</span></span><br><span class="line"><span class="comment">// | size (1 byte)  |    data (size * (element`s size) bytes)     |</span></span><br><span class="line"><span class="comment">// +----------------+---------------------------------------------+</span></span><br></pre></td></tr></table></figure>
+
+<p>这里的 <code>size</code> 用于记录的是元素个数，而并非 <code>data</code> 的总体长度。考虑到使用场景，这里 <code>size</code> 选用 <code>uint8_t</code> 类型，可以根据使用场景适当的调整 <code>size</code> 范围。当 <code>vector</code> 出现嵌套不定长的数组时也是遵循这种方式进行排列：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">// +------+-------------------+-------------------+  </span></span><br><span class="line"><span class="comment">// | size |      Elem 1       |      Elem 2       | .... </span></span><br><span class="line"><span class="comment">// +------+------+------------+------+------------+  </span></span><br><span class="line"><span class="comment">// |      | size |    data    | size |    data    | ...</span></span><br><span class="line"><span class="comment">// +------+------+------------+------+------------+</span></span><br></pre></td></tr></table></figure>
+
+<p>在代码上对于嵌套的实现来说，比如 <code>std::vector&lt;std::string&gt;</code> 在模板中就可以通过递归的方式进行解析。同时两者的实现也需要考虑 <code>offset</code> 的边界问题，因此可以对两者进行分开实现：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">// 字符串长度类型</span></span><br><span class="line"><span class="keyword">using</span> StrSizeType = <span class="type">uint8_t</span>;</span><br><span class="line"><span class="comment">// 数组长度类型</span></span><br><span class="line"><span class="keyword">using</span> ArrSizeType = <span class="type">uint8_t</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">FromBuffer</span>&lt;std::string&gt; &#123;</span><br><span class="line">  <span class="function"><span class="type">int</span> <span class="title">operator</span><span class="params">()</span><span class="params">(std::string&amp; dst, <span class="type">const</span> Buffer&amp; buff, <span class="type">off_t</span> offset)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">constexpr</span> <span class="type">int</span> SizeLen = <span class="built_in">sizeof</span>(StrSizeType);</span><br><span class="line">    <span class="keyword">if</span> (offset &gt; buff.<span class="built_in">size</span>() || offset + SizeLen &gt; buff.<span class="built_in">size</span>()) <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    <span class="keyword">if</span> (offset == buff.<span class="built_in">size</span>()) &#123;</span><br><span class="line">      dst.<span class="built_in">clear</span>();</span><br><span class="line">      <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">auto</span> _data = buff.<span class="built_in">data</span>();</span><br><span class="line">    <span class="keyword">auto</span> _size = *<span class="built_in">reinterpret_cast</span>&lt;<span class="type">const</span> StrSizeType*&gt;(_data + offset);</span><br><span class="line">    dst.<span class="built_in">assign</span>(<span class="built_in">reinterpret_cast</span>&lt;<span class="type">const</span> <span class="type">char</span>*&gt;(_data + offset + SizeLen), _size);</span><br><span class="line">    <span class="keyword">return</span> _size + SizeLen;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">FromBuffer</span>&lt;std::vector&lt;T&gt; &gt; &#123;</span><br><span class="line">  <span class="function"><span class="type">int</span> <span class="title">operator</span><span class="params">()</span><span class="params">(std::vector&lt;T&gt;&amp; dst, <span class="type">const</span> Buffer&amp; buff, <span class="type">off_t</span> offset)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">constexpr</span> <span class="type">int</span> SizeLen = <span class="built_in">sizeof</span>(ArrSizeType);</span><br><span class="line">    <span class="keyword">if</span> (offset &gt; buff.<span class="built_in">size</span>() || offset + SizeLen &gt; buff.<span class="built_in">size</span>()) <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    <span class="keyword">if</span> (offset == buff.<span class="built_in">size</span>()) &#123;</span><br><span class="line">      dst.<span class="built_in">clear</span>();</span><br><span class="line">      <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">auto</span> _data = buff.<span class="built_in">data</span>();</span><br><span class="line">    <span class="keyword">auto</span> _size = *<span class="built_in">reinterpret_cast</span>&lt;<span class="type">const</span> ArrSizeType*&gt;(_data + offset);</span><br><span class="line">    <span class="comment">// 判断是否为class, 用于处理嵌套情况</span></span><br><span class="line">    <span class="function"><span class="keyword">if</span> <span class="title">constexpr</span> <span class="params">(std::is_class_v&lt;T&gt;)</span> </span>&#123;</span><br><span class="line">      <span class="type">off_t</span> _offset = offset + SizeLen;</span><br><span class="line">      <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; _size; i++) &#123;</span><br><span class="line">        T _value;</span><br><span class="line">        <span class="comment">// 递归调用, 当解析失败时返回</span></span><br><span class="line">        <span class="keyword">auto</span> res = <span class="built_in">FromBuffer</span>&lt;T&gt;()(_value, buff, _offset);</span><br><span class="line">        <span class="keyword">if</span> (res &lt; <span class="number">0</span>) <span class="keyword">return</span> res;</span><br><span class="line">        _offset += res;</span><br><span class="line">        dst.<span class="built_in">push_back</span>(std::<span class="built_in">move</span>(_value));</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">return</span> _offset - offset;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="keyword">auto</span> _array = <span class="built_in">reinterpret_cast</span>&lt;<span class="type">const</span> T*&gt;(_data + offset + SizeLen);</span><br><span class="line">      <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; _size; i++) &#123;</span><br><span class="line">        dst.<span class="built_in">push_back</span>(_array[i]);</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">return</span> _size * <span class="built_in">sizeof</span>(T) + SizeLen;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>不难看出其实三者的实现有部分是相同的，那么可以将共同的部分单独拿出来缩短代码的同时也有利于在某些情况下减少代码的生成量，可以定义一个命名空间用来专门放置相关的定义和工具类：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">namespace</span> buffer &#123;</span><br><span class="line"><span class="comment">// buffer类型</span></span><br><span class="line"><span class="keyword">using</span> Type = std::vector&lt;<span class="type">uint8_t</span>&gt;;</span><br><span class="line"><span class="comment">// 字符串长度类型</span></span><br><span class="line"><span class="keyword">using</span> StrSizeType = <span class="type">uint8_t</span>;</span><br><span class="line"><span class="comment">// 数组长度类型</span></span><br><span class="line"><span class="keyword">using</span> ArrSizeType = <span class="type">uint8_t</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Helper</span> &#123;</span><br><span class="line">  <span class="keyword">enum</span> <span class="title class_">RANGE_STATUS</span> : <span class="type">int8_t</span> &#123;</span><br><span class="line">    OUT_OF_RANGE  = <span class="number">-1</span>,</span><br><span class="line">    TO_BUFFER_END = <span class="number">0</span>,</span><br><span class="line">    IN_RANGE,</span><br><span class="line">  &#125;;</span><br><span class="line">  <span class="comment">// 范围判断</span></span><br><span class="line">  <span class="function"><span class="type">static</span> RANGE_STATUS <span class="title">IsInRange</span><span class="params">(<span class="type">size_t</span> buff_size, <span class="type">off_t</span> offset, <span class="type">int</span> size_len)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (offset &gt; buff_size || offset + size_len &gt; buff_size) <span class="keyword">return</span> OUT_OF_RANGE;</span><br><span class="line">    <span class="keyword">if</span> (offset == buff_size) <span class="keyword">return</span> TO_BUFFER_END;</span><br><span class="line">    <span class="keyword">return</span> IN_RANGE;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> RANGE_CHK(BUFF_SIZE, OFFSET, TYPE_SIZE) \</span></span><br><span class="line"><span class="meta"><span class="keyword">if</span> (auto res = buffer::Helper::IsInRange(BUFF_SIZE, OFFSET, TYPE_SIZE) != buffer::Helper::IN_RANGE) &#123; return res; &#125;</span></span><br><span class="line"></span><br><span class="line">&#125; <span class="comment">// buffer</span></span><br></pre></td></tr></table></figure>
+
+<p>因此三者的实现就可以调整为：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 反序列化的核心类</span></span><br><span class="line"><span class="comment"> * @tparam T 目标类型</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">FromBuffer</span> &#123;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 重载()用于转换返回</span></span><br><span class="line"><span class="comment">   * @param dst 目标地址</span></span><br><span class="line"><span class="comment">   * @param buff 待转换的buffer空间</span></span><br><span class="line"><span class="comment">   * @param offset buffer指针偏移量</span></span><br><span class="line"><span class="comment">   * @return 正常返回已处理字节数, 异常时返回 -1</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">int</span> <span class="title">operator</span><span class="params">()</span><span class="params">(T&amp; dst, <span class="type">const</span> buffer::Type&amp; buff, <span class="type">off_t</span> offset)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">RANGE_CHK</span>(buff.<span class="built_in">size</span>(), offset, <span class="built_in">sizeof</span>(T))</span><br><span class="line">    <span class="built_in">memcpy</span>(&amp;dst, buff.<span class="built_in">data</span>() + offset, <span class="built_in">sizeof</span>(T));</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">sizeof</span>(T);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">FromBuffer</span>&lt;std::string&gt; &#123;</span><br><span class="line">  <span class="function"><span class="type">int</span> <span class="title">operator</span><span class="params">()</span><span class="params">(std::string&amp; dst, <span class="type">const</span> buffer::Type&amp; buff, <span class="type">off_t</span> offset)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">constexpr</span> <span class="type">int</span> SizeLen = <span class="built_in">sizeof</span>(buffer::StrSizeType);</span><br><span class="line">    <span class="built_in">RANGE_CHK</span>(buff.<span class="built_in">size</span>(), offset, SizeLen)</span><br><span class="line">    <span class="keyword">auto</span> _data = buff.<span class="built_in">data</span>();</span><br><span class="line">    <span class="keyword">auto</span> _size = *<span class="built_in">reinterpret_cast</span>&lt;<span class="type">const</span> buffer::StrSizeType*&gt;(_data + offset);</span><br><span class="line">    dst.<span class="built_in">assign</span>(<span class="built_in">reinterpret_cast</span>&lt;<span class="type">const</span> <span class="type">char</span>*&gt;(_data + offset + SizeLen), _size);</span><br><span class="line">    <span class="keyword">return</span> _size + SizeLen;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">FromBuffer</span>&lt;std::vector&lt;T&gt; &gt; &#123;</span><br><span class="line">  <span class="function"><span class="type">int</span> <span class="title">operator</span><span class="params">()</span><span class="params">(std::vector&lt;T&gt;&amp; dst, <span class="type">const</span> buffer::Type&amp; buff, <span class="type">off_t</span> offset)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">constexpr</span> <span class="type">int</span> SizeLen = <span class="built_in">sizeof</span>(buffer::ArrSizeType);</span><br><span class="line">    <span class="built_in">RANGE_CHK</span>(buff.<span class="built_in">size</span>(), offset, SizeLen)</span><br><span class="line">    <span class="keyword">auto</span> _data = buff.<span class="built_in">data</span>();</span><br><span class="line">    <span class="keyword">auto</span> _size = *<span class="built_in">reinterpret_cast</span>&lt;<span class="type">const</span> buffer::ArrSizeType*&gt;(_data + offset);</span><br><span class="line">    <span class="comment">// 判断是否为class, 用于处理嵌套情况</span></span><br><span class="line">    <span class="function"><span class="keyword">if</span> <span class="title">constexpr</span> <span class="params">(std::is_class_v&lt;T&gt;)</span> </span>&#123;</span><br><span class="line">      <span class="type">off_t</span> _offset = offset + SizeLen;</span><br><span class="line">      <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; _size; i++) &#123;</span><br><span class="line">        T _value;</span><br><span class="line">        <span class="comment">// 递归调用, 当解析失败时返回</span></span><br><span class="line">        <span class="keyword">auto</span> res = <span class="built_in">FromBuffer</span>&lt;T&gt;()(_value, buff, _offset);</span><br><span class="line">        <span class="keyword">if</span> (res &lt; <span class="number">0</span>) <span class="keyword">return</span> res;</span><br><span class="line">        _offset += res;</span><br><span class="line">        dst.<span class="built_in">push_back</span>(std::<span class="built_in">move</span>(_value));</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">return</span> _offset - offset;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="keyword">auto</span> _array = <span class="built_in">reinterpret_cast</span>&lt;<span class="type">const</span> T*&gt;(_data + offset + SizeLen);</span><br><span class="line">      <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; _size; i++) &#123;</span><br><span class="line">        dst.<span class="built_in">push_back</span>(_array[i]);</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">return</span> _size * <span class="built_in">sizeof</span>(T) + SizeLen;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h3 id="ToBuffer-的实现"><a href="#ToBuffer-的实现" class="headerlink" title="ToBuffer 的实现"></a><code>ToBuffer</code> 的实现</h3><p>三者的实现很简单，毕竟使用了容器来做目标 <em>buffer</em> 空间：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 序列化核心类</span></span><br><span class="line"><span class="comment"> * @tparam T 源类型</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">ToBuffer</span> &#123;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 重载()用于转换返回</span></span><br><span class="line"><span class="comment">   * @param dst 目标buffer</span></span><br><span class="line"><span class="comment">   * @param src 源类型</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">operator</span><span class="params">()</span><span class="params">(buffer::Type&amp; buffer, <span class="type">const</span> T&amp; src)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> ptr = <span class="built_in">reinterpret_cast</span>&lt;<span class="type">const</span> <span class="type">uint8_t</span>*&gt;(&amp;src);</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; <span class="built_in">sizeof</span>(T); i++) &#123;</span><br><span class="line">      buffer.<span class="built_in">push_back</span>(ptr[i]);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">ToBuffer</span>&lt;std::string&gt; &#123;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">operator</span><span class="params">()</span><span class="params">(buffer::Type&amp; buffer, <span class="type">const</span> std::string&amp; src)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">ToBuffer</span>&lt;buffer::StrSizeType&gt;()(buffer, <span class="built_in">static_cast</span>&lt;buffer::StrSizeType&gt;(src.<span class="built_in">size</span>()));</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">auto</span> i : src) &#123;</span><br><span class="line">      buffer.<span class="built_in">push_back</span>(i);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">ToBuffer</span>&lt;std::vector&lt;T&gt; &gt; &#123;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">operator</span><span class="params">()</span><span class="params">(buffer::Type&amp; buffer, <span class="type">const</span> std::vector&lt;T&gt;&amp; src)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">ToBuffer</span>&lt;buffer::ArrSizeType&gt;()(buffer, <span class="built_in">static_cast</span>&lt;buffer::ArrSizeType&gt;(src.<span class="built_in">size</span>()));</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">const</span> <span class="keyword">auto</span>&amp; i : src) &#123;</span><br><span class="line">      <span class="built_in">ToBuffer</span>&lt;T&gt;()(buffer, i);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h2 id="包装"><a href="#包装" class="headerlink" title="包装"></a>包装</h2><p>由于 C++ 中函数无法进行偏特化，因此使用类模板调用时需要指定类型进行调用：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">...</span><br><span class="line">tools::<span class="built_in">ToBuffer</span>&lt;std::string&gt;()(buff, str, <span class="number">0</span>);</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<p>所以需要进行一次调整和封装来更好的便于使用：</p>
+<ul>
+<li>将转换的整体逻辑迁移至 <code>_impl</code> 命名空间内</li>
+<li>在外部的命名空间内实现 <code>Serialized</code> 和 <code>Deserialized</code> 两个接口</li>
+</ul>
+<p>因此整体可以这样实现：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">namespace</span> cvt &#123;</span><br><span class="line"><span class="keyword">namespace</span> _impl &#123;</span><br><span class="line">... <span class="comment">// 转换的主要逻辑</span></span><br><span class="line">&#125; <span class="comment">// _impl</span></span><br><span class="line"></span><br><span class="line"><span class="comment">////////////////////  Binary Cvt Api  ////////////////////</span></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Binary</span> &#123;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 单元素序列化</span></span><br><span class="line"><span class="comment">   * @tparam T 值类型</span></span><br><span class="line"><span class="comment">   * @param buffer 目标空间</span></span><br><span class="line"><span class="comment">   * @param value 待转换值</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function">  <span class="type">static</span> <span class="type">void</span> <span class="title">Serialized</span><span class="params">(_impl::buffer::Type&amp; buffer, <span class="type">const</span> T&amp; value)</span> </span>&#123;</span><br><span class="line">    _impl::<span class="built_in">ToBuffer</span>&lt;T&gt;()(buffer, value);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 单元素反序列化</span></span><br><span class="line"><span class="comment">   * @tparam T 目标类型</span></span><br><span class="line"><span class="comment">   * @param value 目标值地址</span></span><br><span class="line"><span class="comment">   * @param buffer 带转换内存空间</span></span><br><span class="line"><span class="comment">   * @return 转换成功与否</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function">  <span class="type">static</span> <span class="type">bool</span> <span class="title">Deserialized</span><span class="params">(T&amp; value, <span class="type">const</span> _impl::buffer::Type&amp; buffer)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> _impl::<span class="built_in">FromBuffer</span>&lt;T&gt;()(value, buffer, <span class="number">0</span>) &gt;= <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">&#125; <span class="comment">// cvt</span></span><br></pre></td></tr></table></figure>
+
+<h1 id="测试"><a href="#测试" class="headerlink" title="测试"></a>测试</h1><p>需要编写一个单元测试来验证转换的逻辑是否正确，这里采用 <em>GoogleTest</em> 进行测试。编写主要的转换逻辑函数，将来回转换的数据进行对比即可：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">CvtTest</span><span class="params">(<span class="type">const</span> T&amp; val, T&amp; result)</span> </span>&#123;</span><br><span class="line">  std::vector&lt;<span class="type">uint8_t</span>&gt; buffer;</span><br><span class="line">  tools::cvt::Binary::<span class="built_in">Serialized</span>(buffer, val);</span><br><span class="line">  <span class="keyword">return</span> tools::cvt::Binary::<span class="built_in">Deserialized</span>(result, buffer);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%89%8D%E8%A8%80"><span class="top-box-text">前言</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E4%BB%A3%E7%A0%81%E5%AE%9E%E7%8E%B0"><span class="top-box-text">代码实现</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E8%AE%BE%E8%AE%A1%E7%9B%AE%E6%A0%87"><span class="top-box-text">设计目标</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E8%BD%AC%E6%8D%A2%E8%AE%BE%E8%AE%A1-%E5%AE%9E%E7%8E%B0"><span class="top-box-text">转换设计&amp;实现</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2"><span class="top-box-text">类型转换</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E8%BD%AC%E6%8D%A2%E6%8E%A5%E5%8F%A3%E8%AE%BE%E8%AE%A1"><span class="top-box-text">转换接口设计</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%AE%9E%E7%8E%B0"><span class="top-box-text">实现</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#FromBuffer-%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="top-box-text">FromBuffer 的实现</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#ToBuffer-%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="top-box-text">ToBuffer 的实现</span></a></li></ol></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%8C%85%E8%A3%85"><span class="top-box-text">包装</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%B5%8B%E8%AF%95"><span class="top-box-text">测试</span></a></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2024/07/16/live555-perf/">
+          <h3 class="post-title">
+            下一篇：LIVE555性能分析&amp;优化
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+
+
+
+
+
+
+
+
+<footer>
+    <div class="site-footer">
+        <div class="social-container">
+            
+            
+            <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
+                <i class="icon icon-github"></i>
+            </a>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+        </div>
+        
+        Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a
+            href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+        
+        
+        
+        
+        
+        
+    </div>
+    <!-- mermaid -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            // 检查用户的首选颜色模式
+            const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            mermaid.initialize({
+                theme: isDarkMode ? 'neutral' : 'base'
+            });
+        }
+    </script>
+    <!-- diagrams -->
+    <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+    <style type="text/css">
+        @media (prefers-color-scheme: dark) {
+            svg {
+                filter: invert(93%) hue-rotate(180deg);
+                background-color: transparent !important;
+            }
+
+            image {
+                filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+            }
+        }
+
+        .mxgraph-container {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</footer>
+
+
+</div>
+</div>
+
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+</body>
+
+</html>
+

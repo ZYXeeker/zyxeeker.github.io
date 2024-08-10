@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>C++中数据转换设计 —— 实现反射</title>
+<meta name="keywords" content="C++中数据转换设计 —— 实现反射, ZYXeeker`s blog">
+<meta name="description" content="
+书接上回，上回完成了数据的二进制转换，在这回需要对结构体的数据成员实现 反射（reflection）
+
+何为反射？在其他大多数语言中有反射的机制，这种机制能在运行态时能够获取到一个类中的所有属性和方法的集合，比如 JS 就能通过Objec">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="C++中数据转换设计 —— 实现反射">
+<meta property="og:description" content="
+书接上回，上回完成了数据的二进制转换，在这回需要对结构体的数据成员实现 反射（reflection）
+
+何为反射？在其他大多数语言中有反射的机制，这种机制能在运行态时能够获取到一个类中的所有属性和方法的集合，比如 JS 就能通过Objec">
+
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://blog.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://blog.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">C++中数据转换设计 —— 实现反射</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2024-08-08</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/C/">
+              C++
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <blockquote>
+<p>书接上回，上回完成了数据的二进制转换，在这回需要对结构体的数据成员实现 <strong>反射</strong>（<em>reflection</em>）</p>
+</blockquote>
+<h1 id="何为反射？"><a href="#何为反射？" class="headerlink" title="何为反射？"></a>何为反射？</h1><p>在其他大多数语言中有反射的机制，这种机制能在运行态时能够获取到一个类中的所有属性和方法的集合，比如 JS 就能通过<code>Object.getOwnPropertyNames()</code> 方法返回其自身属性集合：</p>
+<figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="keyword">var</span> arr = [<span class="string">&quot;a&quot;</span>, <span class="string">&quot;b&quot;</span>, <span class="string">&quot;c&quot;</span>];</span><br><span class="line"><span class="keyword">var</span> list = <span class="title class_">Object</span>.<span class="title function_">getOwnPropertyNames</span>(arr)</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(list)</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight js"><table><tr><td class="code"><pre><span class="line">[<span class="string">&#x27;0&#x27;</span>, <span class="string">&#x27;1&#x27;</span>, <span class="string">&#x27;2&#x27;</span>, <span class="string">&#x27;length&#x27;</span>]</span><br></pre></td></tr></table></figure>
+
+<p>于是可以使用得到的这个数组进行遍历操作：</p>
+<figure class="highlight js"><table><tr><td class="code"><pre><span class="line">list.<span class="title function_">forEach</span>(<span class="function">(<span class="params">item</span>)=&gt;</span>&#123; <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">`arr::<span class="subst">$&#123;item&#125;</span>()`</span>, <span class="string">&quot;--&gt;&quot;</span> , arr1[item]) &#125;)</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="attr">arr</span>::<span class="number">0</span>() --&gt; a</span><br><span class="line"><span class="attr">arr</span>::<span class="number">1</span>() --&gt; b</span><br><span class="line"><span class="attr">arr</span>::<span class="number">2</span>() --&gt; c</span><br><span class="line"><span class="attr">arr</span>::<span class="title function_">length</span>() --&gt; <span class="number">3</span></span><br></pre></td></tr></table></figure>
+
+<p>这样也不难看出如果反射机制运用在数据绑定和转换中确实会带来许多的便利</p>
+<h1 id="如何实现？"><a href="#如何实现？" class="headerlink" title="如何实现？"></a>如何实现？</h1><p>反射机制在C++中有两种实现方式：</p>
+<ul>
+<li>静态反射：采用模板的方式在编译期间决定</li>
+<li>动态反射：类似于 <em>Json</em> 库实现的方式</li>
+</ul>
+<p>这里的使用场景只是用于数据的转换，因此采用静态的方法进行实现<br>在静态反射需要使用的一个很重要的工具类： <code>tuple</code>（元组） 。元组需要在 C++ 中明确元素的类型，这样才能在编译期决定代码的排列，即：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">std::tuple&lt;<span class="type">int</span>, <span class="type">char</span>, std::string&gt; _tuple &#123; <span class="number">1</span>, <span class="string">&#x27;F&#x27;</span>, <span class="string">&quot;ABCD&quot;</span> &#125;;</span><br><span class="line"><span class="keyword">auto</span> i = std::<span class="built_in">get</span>&lt;<span class="number">0</span>&gt;(_tuple);</span><br><span class="line"><span class="keyword">auto</span> c = std::<span class="built_in">get</span>&lt;<span class="number">1</span>&gt;(_tuple);</span><br><span class="line"><span class="keyword">auto</span> str = std::<span class="built_in">get</span>&lt;<span class="number">2</span>&gt;(_tuple);</span><br></pre></td></tr></table></figure>
+
+<h2 id="对-tuple-的简单分析"><a href="#对-tuple-的简单分析" class="headerlink" title="对 tuple 的简单分析"></a>对 <code>tuple</code> 的简单分析</h2><p>由于元组需要在编译器期间决定数据类型，因此需要在在编写期间进行赋值由编译器进行推导或者明确类型交予后续的赋值处理。那么元组的实际组成是什么样的呢？以及它如何进行构成的？</p>
+<blockquote>
+<p>这里的代码分析基于 <i><u>MSVC 14.40.33807</u></i> </p>
+</blockquote>
+<p>查看&amp;精简源代码可知：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_Ty</span>&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">_Tuple_val</span> &#123; <span class="comment">// stores each value in a tuple</span></span><br><span class="line">    <span class="keyword">constexpr</span> _Tuple_val() : _Val() &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_Other</span>&gt;</span><br><span class="line">    <span class="keyword">constexpr</span> _Tuple_val(_Other&amp;&amp; _Arg) : _Val(_STD forward&lt;_Other&gt;(_Arg)) &#123;&#125;</span><br><span class="line">    ...</span><br><span class="line">    <span class="comment">// 被保存的实际值</span></span><br><span class="line">    _Ty _Val;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_This</span>, <span class="keyword">class</span>... _Rest&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">tuple</span>&lt;_This, _Rest...&gt; : <span class="keyword">private</span> tuple&lt;_Rest...&gt; &#123; <span class="comment">// recursive tuple definition</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">	<span class="comment">// 保存当前的元素类型</span></span><br><span class="line">    <span class="keyword">using</span> _This_type = _This;</span><br><span class="line">    <span class="comment">// 记录基类的元素类型</span></span><br><span class="line">    <span class="keyword">using</span> _Mybase    = tuple&lt;_Rest...&gt;;</span><br><span class="line">    ...</span><br><span class="line">    <span class="comment">// 用于保存元素值的成员</span></span><br><span class="line">    _Tuple_val&lt;_This&gt; _Myfirst; <span class="comment">// the stored element</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>不难看出其实元组实际上是通过<strong>递归继承自我</strong>的方式来实现的，而且最底层的构成并不是十分复杂，其他的基本是对接标准库接口或者自身的 API：</p>
+<pre class="mermaid">classDiagram
+direction RL
+    class `_Tuple_val<_Ty>` {
+        +_Ty _Val;
+        +...()
+    }
+    class `tuple<_This, _Rest...>`{
+        +_Tuple_val<_This> _Myfirst;
+        +...()
+    }
+    `tuple<_This, _Rest...>` *-- `_Tuple_val<_Ty>`
+    `tuple<_This, _Rest...>` <|-- `tuple<_This, _Rest...>`</pre>
+
+<p>那 <code>std::get</code> 是如何拿到元素值的呢？查看对应的源码：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_This</span>, <span class="keyword">class</span>... _Rest&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">_MSVC_KNOWN_SEMANTICS</span> tuple_element&lt;<span class="number">0</span>, tuple&lt;_This, _Rest...&gt;&gt; &#123; <span class="comment">// select first element</span></span><br><span class="line">    <span class="keyword">using</span> type = _This;</span><br><span class="line">    <span class="comment">// MSVC assumes the meaning of _Ttype; remove or rename, but do not change semantics</span></span><br><span class="line">    <span class="keyword">using</span> _Ttype = tuple&lt;_This, _Rest...&gt;;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="type">size_t</span> _Index, <span class="keyword">class</span> <span class="title class_">_This</span>, <span class="keyword">class</span>... _Rest&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">_MSVC_KNOWN_SEMANTICS</span> tuple_element&lt;_Index, tuple&lt;_This, _Rest...&gt;&gt;</span><br><span class="line">    : tuple_element&lt;_Index - <span class="number">1</span>, tuple&lt;_Rest...&gt;&gt; &#123;&#125;; <span class="comment">// recursive tuple_element definition</span></span><br><span class="line"></span><br><span class="line">_EXPORT_STD <span class="keyword">template</span> &lt;<span class="type">size_t</span> _Index, <span class="keyword">class</span>... _Types&gt;</span><br><span class="line">_NODISCARD <span class="keyword">constexpr</span> <span class="type">tuple_element_t</span>&lt;_Index, tuple&lt;_Types...&gt;&gt;&amp; <span class="built_in">get</span>(tuple&lt;_Types...&gt;&amp; _Tuple) <span class="keyword">noexcept</span> &#123;</span><br><span class="line">    <span class="keyword">using</span> _Ttype = <span class="keyword">typename</span> tuple_element&lt;_Index, tuple&lt;_Types...&gt;&gt;::_Ttype;</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">static_cast</span>&lt;_Ttype&amp;&gt;(_Tuple)._Myfirst._Val;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看出对应的 <code>get</code> 在知晓传入元组的类型后调用了 <code>tuple_element</code> 结构体来对传入的下标进行递归减少，当 <code>_Index</code> 为 0 时取得对应的元素类型，然后对传入的元组进行转换拿到对应的元素值。同时也可以看出编译器会强制要求元组的顺序性，保证 <code>get</code> 返回正确数据</p>
+<h1 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h1><p>对于需要进行数据绑定和转换的结构体来说，可以指定一个元组来保存所需要成员的相关参数，这里列举三个：</p>
+<ol>
+<li>类型</li>
+<li>名称</li>
+<li>地址</li>
+</ol>
+<p>因此需要定义个结构体来进行保存：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 属性(成员)元数据</span></span><br><span class="line"><span class="comment"> * @tparam Class 类/结构体</span></span><br><span class="line"><span class="comment"> * @tparam T 成员类型</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> Class, <span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">PropertyMeta</span> &#123;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 编译器构造函数</span></span><br><span class="line"><span class="comment">   * @param member 成员地址</span></span><br><span class="line"><span class="comment">   * @param name 成员名</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="keyword">constexpr</span> <span class="title">PropertyMeta</span><span class="params">(T Class::*member, <span class="type">const</span> <span class="type">char</span>* name)</span></span></span><br><span class="line"><span class="function">      : Name(name),</span></span><br><span class="line"><span class="function">        Member(member) &#123;</span>&#125;</span><br><span class="line">  <span class="comment">// 类型</span></span><br><span class="line">  <span class="keyword">using</span> Type = T;</span><br><span class="line">  <span class="comment">// 成员名称</span></span><br><span class="line">  <span class="type">const</span> <span class="type">char</span>* Name;</span><br><span class="line">  <span class="comment">// 成员地址</span></span><br><span class="line">  T Class::*Member;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>定义了之后就可以使用 <code>tuple</code> 来保存所需要处理的成员：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">A</span> &#123;</span><br><span class="line">  <span class="type">int</span> num;</span><br><span class="line">  <span class="type">char</span> txt;</span><br><span class="line"></span><br><span class="line">  <span class="type">static</span> <span class="keyword">constexpr</span> <span class="keyword">auto</span> Tuple = std::<span class="built_in">make_tuple</span>(</span><br><span class="line">      tools::<span class="built_in">PropertyMeta</span>&lt;A, <span class="type">int</span>&gt;(&amp;A::num, <span class="string">&quot;num&quot;</span>),</span><br><span class="line">      tools::<span class="built_in">PropertyMeta</span>&lt;A, <span class="type">char</span>&gt;(&amp;A::txt, <span class="string">&quot;txt&quot;</span>));</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  A a &#123;</span><br><span class="line">    .num = <span class="number">1</span>,</span><br><span class="line">    .txt = <span class="string">&#x27;F&#x27;</span></span><br><span class="line">  &#125;;</span><br><span class="line">  <span class="comment">// 打印输出两个成员</span></span><br><span class="line">  std::cout &lt;&lt; <span class="string">&quot;(&quot;</span> &lt;&lt; std::<span class="built_in">get</span>&lt;<span class="number">0</span>&gt;(A::Tuple).Name &lt;&lt; <span class="string">&quot;, &quot;</span> </span><br><span class="line">            &lt;&lt; a.*(std::<span class="built_in">get</span>&lt;<span class="number">0</span>&gt;(A::Tuple).Member) &lt;&lt; <span class="string">&quot;)&quot;</span> &lt;&lt; std::endl; <span class="comment">// (num, 1)</span></span><br><span class="line">  std::cout &lt;&lt; <span class="string">&quot;(&quot;</span> &lt;&lt; std::<span class="built_in">get</span>&lt;<span class="number">1</span>&gt;(A::Tuple).Name &lt;&lt; <span class="string">&quot;, &quot;</span> </span><br><span class="line">            &lt;&lt; a.*(std::<span class="built_in">get</span>&lt;<span class="number">1</span>&gt;(A::Tuple).Member) &lt;&lt; <span class="string">&quot;)&quot;</span> &lt;&lt; std::endl; <span class="comment">// (txt, F)</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>同时为了便于使用，还是需要定义合适的函数模板以及宏，因此这一块的最终实现如下：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">namespace</span> tools &#123;</span><br><span class="line"><span class="comment">// 用于生成属性元组的区域</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> VAR_PROPERTY_SCOPE(CLASS, ...) \</span></span><br><span class="line"><span class="meta">  using __Var = CLASS;                 \</span></span><br><span class="line"><span class="meta">  static constexpr auto __Property = std::make_tuple(__VA_ARGS__);</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 默认方式</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> VAR_PROPERTY(MEMBER) \</span></span><br><span class="line"><span class="meta">  tools::PropertyMeta(&amp;Elem::MEMBER, #MEMBER)</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 自定义成员名称</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> VAR_PROPERTY_SCHEME(MEMBER, MEMBER_NAME) \</span></span><br><span class="line"><span class="meta">  tools::PropertyMeta(&amp;Elem::MEMBER, MEMBER_NAME)</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">namespace</span> _impl &#123;</span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 属性(成员)元数据</span></span><br><span class="line"><span class="comment"> * @tparam Class 类/结构体</span></span><br><span class="line"><span class="comment"> * @tparam T 成员类型</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> Class, <span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">PropertyMeta</span> &#123;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 编译器构造函数</span></span><br><span class="line"><span class="comment">   * @param member 成员地址</span></span><br><span class="line"><span class="comment">   * @param name 成员名/字段</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="keyword">constexpr</span> <span class="title">PropertyMeta</span><span class="params">(T Class::*member, <span class="type">const</span> <span class="type">char</span>* name)</span></span></span><br><span class="line"><span class="function">      : Name(name),</span></span><br><span class="line"><span class="function">        Member(member) &#123;</span>&#125;</span><br><span class="line">  <span class="comment">// 类型</span></span><br><span class="line">  <span class="keyword">using</span> Type = T;</span><br><span class="line">  <span class="comment">// 成员名称</span></span><br><span class="line">  <span class="type">const</span> <span class="type">char</span>* Name;</span><br><span class="line">  <span class="comment">// 成员地址</span></span><br><span class="line">  T Class::*Member;</span><br><span class="line">&#125;;</span><br><span class="line">&#125; <span class="comment">// _impl</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 生成对应属性(成员)元数据</span></span><br><span class="line"><span class="comment"> * @tparam Class 类/结构体</span></span><br><span class="line"><span class="comment"> * @tparam T 成员类型</span></span><br><span class="line"><span class="comment"> * @param member 成员地址</span></span><br><span class="line"><span class="comment"> * @param name 成员名/字段</span></span><br><span class="line"><span class="comment"> * @return 返回元数据</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> Class, <span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="function"><span class="keyword">constexpr</span> <span class="keyword">auto</span> <span class="title">PropertyMeta</span><span class="params">(T Class::*member, <span class="type">const</span> <span class="type">char</span>* name)</span> </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> _impl::<span class="built_in">PropertyMeta</span>&lt;Class, T&gt;(member, name);</span><br><span class="line">&#125;</span><br><span class="line">&#125; <span class="comment">// tools</span></span><br></pre></td></tr></table></figure>
+<p>因此在结构体中调用就可以变成</p>
+<div style="display: flex;justify-content : center;align-items: center;">
+<div>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">A</span> &#123;</span><br><span class="line">  <span class="type">int</span> num;</span><br><span class="line">  <span class="type">char</span> txt;</span><br><span class="line">  <span class="type">static</span> <span class="keyword">constexpr</span> <span class="keyword">auto</span> Tuple = std::<span class="built_in">make_tuple</span>(</span><br><span class="line">      tools::<span class="built_in">PropertyMeta</span>&lt;A, <span class="type">int</span>&gt;(&amp;A::num, <span class="string">&quot;num&quot;</span>),</span><br><span class="line">      tools::<span class="built_in">PropertyMeta</span>&lt;A, <span class="type">char</span>&gt;(&amp;A::txt, <span class="string">&quot;txt&quot;</span>));</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+</div>
+<div>
+➡
+</div>
+<div>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">A</span> &#123;</span><br><span class="line">  <span class="type">int</span> num;</span><br><span class="line">  <span class="type">char</span> txt;</span><br><span class="line">  <span class="built_in">VAR_PROPERTY_SCOPE</span>(A,</span><br><span class="line">                     <span class="built_in">VAR_PROPERTY</span>(num),</span><br><span class="line">                     <span class="built_in">VAR_PROPERTY</span>(txt))</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+</div>
+</div>
+
+<p>那么现在有个问题，如何对元组进行遍历呢？毕竟无法从元组中获取对应的个数信息，然后通过 <code>get</code> 来进行依次获取。对于这个问题在不同的版本中有各自对应的解决方案，这里使用 C++17 中的 <code>std::apply</code> 来解决：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">if</span> _HAS_CXX17</span></span><br><span class="line"><span class="comment">// <span class="doctag">TODO:</span> Support other version</span></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 遍历属性数据</span></span><br><span class="line"><span class="comment"> * @tparam Args 元素类型</span></span><br><span class="line"><span class="comment"> * @tparam Handler 处理函数类型</span></span><br><span class="line"><span class="comment"> * @param tuple 元组</span></span><br><span class="line"><span class="comment"> * @param handler 处理函数回调</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span>... Args, <span class="keyword">typename</span> Handler&gt;</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">PropertyForeach</span><span class="params">(<span class="type">const</span> std::tuple&lt;Args...&gt;&amp; tuple, Handler&amp;&amp; handler)</span> </span>&#123;</span><br><span class="line">  std::<span class="built_in">apply</span>([&amp;](<span class="type">const</span> Args&amp;... args) &#123;</span><br><span class="line">    (<span class="built_in">handler</span>(args), ...);</span><br><span class="line">  &#125;, tuple);</span><br><span class="line">&#125;</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+
+<p>有了上面这些处理后，对于正反序列化来说就可以更进一步的完善：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 序列化</span></span><br><span class="line"><span class="comment"> * @tparam T 值类型</span></span><br><span class="line"><span class="comment"> * @param buffer 目标空间</span></span><br><span class="line"><span class="comment"> * @param value 待转换值</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Serialized</span><span class="params">(_impl::buffer::Type &amp;buffer, <span class="type">const</span> T &amp;value)</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 遍历属性中的成员数据, 按照顺序进行转换</span></span><br><span class="line">  <span class="built_in">PropertyForeach</span>(T::__Property, [&amp;](<span class="keyword">auto</span> elem) &#123;</span><br><span class="line">    _impl::<span class="built_in">ToBuffer</span>&lt;<span class="keyword">typename</span> <span class="keyword">decltype</span>(elem)::Type&gt;()(buffer, value.*(elem.Member));</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 反序列化</span></span><br><span class="line"><span class="comment"> * @tparam T 目标类型</span></span><br><span class="line"><span class="comment"> * @param value 目标值地址</span></span><br><span class="line"><span class="comment"> * @param buffer 带转换内存空间</span></span><br><span class="line"><span class="comment"> * @return 转换成功与否</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">Deserialized</span><span class="params">(T &amp;value, <span class="type">const</span> _impl::buffer::Type &amp;buffer)</span> </span>&#123;</span><br><span class="line">  <span class="type">int</span> offset = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">try</span> &#123;</span><br><span class="line">    <span class="comment">// 遍历属性中的成员数据, 按照顺序进行转换</span></span><br><span class="line">    <span class="built_in">PropertyForeach</span>(T::__Property, [&amp;](<span class="keyword">auto</span> elem) &#123;</span><br><span class="line">      <span class="keyword">auto</span> len = _impl::<span class="built_in">FromBuffer</span>&lt;<span class="keyword">typename</span> <span class="keyword">decltype</span>(elem)::Type&gt;()(value.*(elem.Member), buffer, offset);</span><br><span class="line">      <span class="comment">// 解析出错时及时抛出异常结束遍历</span></span><br><span class="line">      <span class="keyword">if</span> (len &lt; <span class="number">0</span>) <span class="keyword">throw</span> std::<span class="built_in">logic_error</span>(<span class="string">&quot;tools::cvt =&gt; bad parsed&quot;</span>);</span><br><span class="line">      offset += len;</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">catch</span> (...) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这样就实现了对结构体的成员进行数据绑定和转换</p>
+<h1 id="测试"><a href="#测试" class="headerlink" title="测试"></a>测试</h1><p>同上节，也是进行来回转换进行比对：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Complex</span> &#123;</span><br><span class="line">  <span class="type">int8_t</span> int_8;</span><br><span class="line">  <span class="type">int16_t</span> int_16;</span><br><span class="line">  <span class="type">int32_t</span> int_32;</span><br><span class="line">  <span class="type">int64_t</span> int_64;</span><br><span class="line">  <span class="type">float</span> f_4;</span><br><span class="line">  <span class="type">double</span> f_8;</span><br><span class="line">  std::string str;</span><br><span class="line">  std::vector&lt;<span class="type">int</span>&gt; int_arr;</span><br><span class="line">  std::vector&lt;std::string&gt; str_arr;</span><br><span class="line"></span><br><span class="line">  <span class="built_in">VAR_PROPERTY_SCOPE</span>(Complex,</span><br><span class="line">                     <span class="built_in">VAR_PROPERTY</span>(int_8),</span><br><span class="line">                     <span class="built_in">VAR_PROPERTY</span>(int_16),</span><br><span class="line">                     <span class="built_in">VAR_PROPERTY</span>(int_32),</span><br><span class="line">                     <span class="built_in">VAR_PROPERTY</span>(int_64),</span><br><span class="line">                     <span class="built_in">VAR_PROPERTY</span>(f_4),</span><br><span class="line">                     <span class="built_in">VAR_PROPERTY</span>(f_8),</span><br><span class="line">                     <span class="built_in">VAR_PROPERTY</span>(str),</span><br><span class="line">                     <span class="built_in">VAR_PROPERTY</span>(int_arr),</span><br><span class="line">                     <span class="built_in">VAR_PROPERTY</span>(str_arr)</span><br><span class="line">                     )</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">CvtComplexTest</span><span class="params">(<span class="type">const</span> T&amp; val, T&amp; result)</span> </span>&#123;</span><br><span class="line">  std::vector&lt;<span class="type">uint8_t</span>&gt; buffer;</span><br><span class="line">  <span class="comment">// 不为struct/class则返回false</span></span><br><span class="line">  <span class="comment">// <span class="doctag">TODO:</span> !!!无法判断基本的容器类型</span></span><br><span class="line">  <span class="function"><span class="keyword">if</span> <span class="title">constexpr</span> <span class="params">(!std::is_class_v&lt;T&gt;)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  tools::cvt::Bianry::<span class="built_in">Serialized</span>(buffer, val);</span><br><span class="line">  <span class="keyword">return</span> tools::cvt::Bianry::<span class="built_in">Deserialized</span>(result, buffer);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E4%BD%95%E4%B8%BA%E5%8F%8D%E5%B0%84%EF%BC%9F"><span class="top-box-text">何为反射？</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%EF%BC%9F"><span class="top-box-text">如何实现？</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%AF%B9-tuple-%E7%9A%84%E7%AE%80%E5%8D%95%E5%88%86%E6%9E%90"><span class="top-box-text">对 tuple 的简单分析</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%AE%9E%E7%8E%B0"><span class="top-box-text">实现</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%B5%8B%E8%AF%95"><span class="top-box-text">测试</span></a></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2024/07/31/struct-cvt-binary/">
+          <h3 class="post-title">
+            下一篇：C++中数据转换设计 —— 二进制数据转换
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+
+
+
+
+
+
+
+
+<footer>
+    <div class="site-footer">
+        <div class="social-container">
+            
+            
+            <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
+                <i class="icon icon-github"></i>
+            </a>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+        </div>
+        
+        Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a
+            href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+        
+        
+        
+        
+        
+        
+    </div>
+    <!-- mermaid -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            // 检查用户的首选颜色模式
+            const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            mermaid.initialize({
+                theme: isDarkMode ? 'neutral' : 'base'
+            });
+        }
+    </script>
+    <!-- diagrams -->
+    <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+    <style type="text/css">
+        @media (prefers-color-scheme: dark) {
+            svg {
+                filter: invert(93%) hue-rotate(180deg);
+                background-color: transparent !important;
+            }
+
+            image {
+                filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+            }
+        }
+
+        .mxgraph-container {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</footer>
+
+
+</div>
+</div>
+
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+</body>
+
+</html>
+
