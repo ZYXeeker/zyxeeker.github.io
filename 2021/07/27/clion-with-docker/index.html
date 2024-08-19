@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>CLion连接Docker</title>
+<meta name="keywords" content="CLion连接Docker, ZYXeeker`s blog">
+<meta name="description" content="配置 Docker创建 DockerfileFROM ubuntu:18.04ENV DEBIAN_FRONTEND=noninteractive# 更换ubuntu的源RUN echo &quot;deb http://mirrors.a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="CLion连接Docker">
+<meta property="og:description" content="配置 Docker创建 DockerfileFROM ubuntu:18.04ENV DEBIAN_FRONTEND=noninteractive# 更换ubuntu的源RUN echo &quot;deb http://mirrors.a">
+
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://blog.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://blog.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">CLion连接Docker</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2021-07-27</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/docker-C/">
+              docker,C++
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <h1 id="配置-Docker"><a href="#配置-Docker" class="headerlink" title="配置 Docker"></a>配置 <em>Docker</em></h1><h2 id="创建-Dockerfile"><a href="#创建-Dockerfile" class="headerlink" title="创建 Dockerfile"></a>创建 <em>Dockerfile</em></h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">FROM ubuntu:18.04</span><br><span class="line"></span><br><span class="line">ENV DEBIAN_FRONTEND=noninteractive</span><br><span class="line"></span><br><span class="line"><span class="comment"># 更换ubuntu的源</span></span><br><span class="line">RUN <span class="built_in">echo</span> <span class="string">&quot;deb http://mirrors.aliyun.com/ubuntu/ focal main restricted universe multiverse&quot;</span> \ </span><br><span class="line">  <span class="string">&quot;deb-src http://mirrors.aliyun.com/ubuntu/ focal main restricted universe multiverse&quot;</span> \</span><br><span class="line">  <span class="string">&quot;deb http://mirrors.aliyun.com/ubuntu/ focal-security main restricted universe multiverse&quot;</span> \</span><br><span class="line">  <span class="string">&quot;deb-src http://mirrors.aliyun.com/ubuntu/ focal-security main restricted universe multiverse&quot;</span> \</span><br><span class="line">  <span class="string">&quot;deb http://mirrors.aliyun.com/ubuntu/ focal-updates main restricted universe multiverse&quot;</span> \</span><br><span class="line">  <span class="string">&quot;deb-src http://mirrors.aliyun.com/ubuntu/ focal-updates main restricted universe multiverse&quot;</span> \</span><br><span class="line">  <span class="string">&quot;deb http://mirrors.aliyun.com/ubuntu/ focal-proposed main restricted universe multiverse&quot;</span> \</span><br><span class="line">  <span class="string">&quot;deb-src http://mirrors.aliyun.com/ubuntu/ focal-proposed main restricted universe multiverse&quot;</span> \</span><br><span class="line">  <span class="string">&quot;deb http://mirrors.aliyun.com/ubuntu/ focal-backports main restricted universe multiverse&quot;</span> \</span><br><span class="line">  <span class="string">&quot;deb-src http://mirrors.aliyun.com/ubuntu/ focal-backports main restricted universe multiverse&quot;</span> &gt; /etc/apt/sources.list</span><br><span class="line"></span><br><span class="line">RUN apt-get update</span><br><span class="line"></span><br><span class="line"><span class="comment"># 安装GCC环境</span></span><br><span class="line">RUN apt-get install -y build-essential</span><br><span class="line">RUN apt-get install -y cmake</span><br><span class="line">RUN apt-get install -y gdb</span><br><span class="line"></span><br><span class="line">RUN apt-get install -y openssh-server</span><br><span class="line">RUN <span class="built_in">mkdir</span> /var/run/sshd</span><br><span class="line">RUN sed -ri <span class="string">&#x27;s/^PermitRootLogin\s+.*/PermitRootLogin yes/&#x27;</span> /etc/ssh/sshd_config</span><br><span class="line">RUN sed -ri <span class="string">&#x27;s/UsePAM yes/#UsePAM yes/g&#x27;</span> /etc/ssh/sshd_config</span><br><span class="line"></span><br><span class="line">RUN apt-get install -y rsync</span><br><span class="line">RUN sed -ri <span class="string">&#x27;s/RSYNC_ENABLE=false/RSYNC_ENABLE=true/g&#x27;</span> /etc/default/rsync</span><br><span class="line">COPY rsync.conf /etc</span><br><span class="line"></span><br><span class="line">RUN <span class="built_in">echo</span> <span class="string">&#x27;root:000000&#x27;</span> |chpasswd</span><br><span class="line"></span><br><span class="line">RUN <span class="built_in">mkdir</span> /root/sync</span><br><span class="line"></span><br><span class="line">COPY entrypoint.sh /sbin</span><br><span class="line">RUN <span class="built_in">chmod</span> +x /sbin/entrypoint.sh</span><br><span class="line">ENTRYPOINT [ <span class="string">&quot;/sbin/entrypoint.sh&quot;</span> ]</span><br></pre></td></tr></table></figure>
+<h2 id="创建必要的文件"><a href="#创建必要的文件" class="headerlink" title="创建必要的文件"></a>创建必要的文件</h2><p><em>rsync.conf</em>: 用来对文件进行同步，没有这个的话两边无法交互文件</p>
+<figure class="highlight ini"><table><tr><td class="code"><pre><span class="line">max <span class="attr">connections</span> = <span class="number">8</span></span><br><span class="line">log <span class="attr">file</span> = /var/log/rsync.log</span><br><span class="line"><span class="attr">timeout</span> = <span class="number">300</span></span><br><span class="line"></span><br><span class="line"><span class="section">[sync]</span></span><br><span class="line"><span class="attr">comment</span> = sync</span><br><span class="line"><span class="comment"># 你需要同步的文件夹</span></span><br><span class="line"><span class="attr">path</span> = /root/sync</span><br><span class="line">read <span class="attr">only</span> = <span class="literal">no</span></span><br><span class="line"><span class="attr">list</span> = <span class="literal">yes</span></span><br><span class="line"><span class="attr">uid</span> = root</span><br><span class="line"><span class="attr">gid</span> = root</span><br></pre></td></tr></table></figure>
+
+<p><em>entrypoint.sh</em>: 启动脚本</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="meta">#!/bin/bash</span></span><br><span class="line"></span><br><span class="line">/usr/bin/rsync --daemon --config=/etc/rsync.conf</span><br><span class="line">/usr/sbin/sshd -D</span><br></pre></td></tr></table></figure>
+
+<h2 id="创建-docker-compose-yml-文件"><a href="#创建-docker-compose-yml-文件" class="headerlink" title="创建 docker-compose.yml 文件"></a>创建 <em>docker-compose.yml</em> 文件</h2><figure class="highlight yml"><table><tr><td class="code"><pre><span class="line"><span class="attr">version:</span> <span class="string">&quot;3&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="attr">services:</span></span><br><span class="line">  <span class="attr">env:</span></span><br><span class="line">  <span class="comment"># 目标镜像</span></span><br><span class="line">    <span class="attr">image:</span> <span class="string">clion/server:1.0</span> </span><br><span class="line">    <span class="comment"># 运行的镜像名</span></span><br><span class="line">    <span class="attr">container_name:</span> <span class="string">webSever</span></span><br><span class="line">    <span class="comment"># 端口（放下面解释）</span></span><br><span class="line">    <span class="attr">ports:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">&quot;2222:22&quot;</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">&quot;8730:873&quot;</span></span><br><span class="line">    <span class="attr">cap_add:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">ALL</span></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>2222:22</code>（<code>SSH</code>）：由于本地端口会起冲突，所以用<code>2222</code>端口代替</li>
+<li><code>8730:873</code>（<code>rsync</code>）：同理</li>
+</ul>
+<h1 id="运行"><a href="#运行" class="headerlink" title="运行"></a>运行</h1><p>执行 <em>build</em>：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">docker build -t clion/remote-cpp-env:1.0 -f Dockerfile .</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>clion/remote-cpp-env:0.5</code> ：是你要生成镜像的 <u>名字</u> 与 <u>版本</u></li>
+<li><code>Dockerfile</code> ：是你之前写的 <em>dockerfile</em> 的文件名</li>
+<li>最后的一个 <code>.</code> 表示在当前目录下</li>
+</ul>
+<p><em>docker-compose</em> 命令:</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">docker-compose up</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">后台执行</span></span><br><span class="line">docker-compose up -d</span><br></pre></td></tr></table></figure>
+
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E9%85%8D%E7%BD%AE-Docker"><span class="top-box-text">配置 Docker</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%88%9B%E5%BB%BA-Dockerfile"><span class="top-box-text">创建 Dockerfile</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%88%9B%E5%BB%BA%E5%BF%85%E8%A6%81%E7%9A%84%E6%96%87%E4%BB%B6"><span class="top-box-text">创建必要的文件</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%88%9B%E5%BB%BA-docker-compose-yml-%E6%96%87%E4%BB%B6"><span class="top-box-text">创建 docker-compose.yml 文件</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E8%BF%90%E8%A1%8C"><span class="top-box-text">运行</span></a></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+  </div>
+
+
+
+
+
+
+
+
+
+
+<footer>
+    <div class="site-footer">
+        <div class="social-container">
+            
+            
+            <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
+                <i class="icon icon-github"></i>
+            </a>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+        </div>
+        
+        Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a
+            href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+        
+        
+        
+        
+        
+        
+    </div>
+    <!-- mermaid -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            // 检查用户的首选颜色模式
+            const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            mermaid.initialize({
+                theme: isDarkMode ? 'neutral' : 'base'
+            });
+        }
+    </script>
+    <!-- diagrams -->
+    <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+    <style type="text/css">
+        @media (prefers-color-scheme: dark) {
+            svg {
+                filter: invert(93%) hue-rotate(180deg);
+                background-color: transparent !important;
+            }
+
+            image {
+                filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+            }
+        }
+
+        .mxgraph-container {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</footer>
+
+
+</div>
+</div>
+
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+</body>
+
+</html>
+

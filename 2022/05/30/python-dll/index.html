@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>Python调用DLL</title>
+<meta name="keywords" content="Python调用DLL, ZYXeeker`s blog">
+<meta name="description" content="背景算法组在对摄像头进行算法实现是用的 Python 来进行的模拟实现，但 Python 在调用对应的库进行操作时，出现了延迟过大的问题以及无法取到对应的数据导致业务逻辑无法实现，因此我这边编写了一个专门的 SDK 提供给算法组进行使用。这">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="Python调用DLL">
+<meta property="og:description" content="背景算法组在对摄像头进行算法实现是用的 Python 来进行的模拟实现，但 Python 在调用对应的库进行操作时，出现了延迟过大的问题以及无法取到对应的数据导致业务逻辑无法实现，因此我这边编写了一个专门的 SDK 提供给算法组进行使用。这">
+
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://blog.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://blog.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">Python调用DLL</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2022-05-30</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/SDK/">
+              SDK
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>算法组在对摄像头进行算法实现是用的 <em>Python</em> 来进行的模拟实现，但 <em>Python</em> 在调用对应的库进行操作时，出现了延迟过大的问题以及无法取到对应的数据导致业务逻辑无法实现，因此我这边编写了一个专门的 SDK 提供给算法组进行使用。这里主要是记录下 <em>Python</em> 如何调用DLL</p>
+<h1 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h1><h2 id="DLL-对外接口"><a href="#DLL-对外接口" class="headerlink" title="DLL 对外接口"></a>DLL 对外接口</h2><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> PY_CAPTURE_H_</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> PY_CAPTURE_H_</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> DLLEXPORT extern <span class="string">&quot;C&quot;</span> __declspec(dllexport)</span></span><br><span class="line"></span><br><span class="line"><span class="function">DLLEXPORT <span class="type">void</span> <span class="title">init</span><span class="params">(<span class="type">int</span> w, <span class="type">int</span> h, <span class="type">char</span> *name)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function">DLLEXPORT <span class="type">void</span> <span class="title">start</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function">DLLEXPORT <span class="type">void</span> <span class="title">stop</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function">DLLEXPORT <span class="type">unsigned</span> <span class="type">char</span> *<span class="title">get_frame</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function">DLLEXPORT <span class="type">void</span> <span class="title">save_frame</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *path)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span> <span class="comment">//PY_CAPTURE_H_</span></span></span><br></pre></td></tr></table></figure>
+<h2 id="Python-对接"><a href="#Python-对接" class="headerlink" title="Python 对接"></a><em>Python</em> 对接</h2><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> ctypes, cv2, os</span><br><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="comment"># 示例dll路径</span></span><br><span class="line">os.add_dll_directory(<span class="string">r&quot;D:\\&quot;</span>)</span><br><span class="line">lib = ctypes.cdll.LoadLibrary(<span class="string">r&quot;D:\SDK\CaptrueSdk.dll&quot;</span>)</span><br><span class="line"><span class="comment"># init 中输入分辨率大小和设备名</span></span><br><span class="line">lib.init(<span class="number">1280</span>, <span class="number">720</span>, <span class="string">b&quot;UVC Camera&quot;</span>)</span><br><span class="line"><span class="comment"># 开始捕获视频流</span></span><br><span class="line">lib.start()</span><br><span class="line"><span class="comment"># 定义返回类型</span></span><br><span class="line">lib.get_frame.restype = ctypes.POINTER(ctypes.c_uint16)</span><br><span class="line">pointer = lib.get_frame()</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">    pointer = lib.get_frame()</span><br><span class="line">    _src = np.asarray(np.fromiter(pointer, dtype=np.uint16, count=<span class="number">1280</span> * <span class="number">720</span>))</span><br><span class="line">    src = _src.reshape((<span class="number">720</span>, <span class="number">1280</span>))</span><br><span class="line">    <span class="comment"># 保存frame</span></span><br><span class="line">    lib.save_frame()</span><br><span class="line">    <span class="comment"># 灰度化</span></span><br><span class="line">    img = cv2.cvtColor(((src / src.<span class="built_in">max</span>()) * <span class="number">255</span>).astype(np.uint8), cv2.COLOR_GRAY2BGR)</span><br><span class="line">    image = np.array(img)</span><br><span class="line">    <span class="comment"># 预览视频</span></span><br><span class="line">    cv2.imshow(<span class="string">&quot;RAW&quot;</span>, image)</span><br><span class="line">    cv2.waitKey(<span class="number">1</span>)</span><br></pre></td></tr></table></figure>
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E8%83%8C%E6%99%AF"><span class="top-box-text">背景</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%AE%9E%E7%8E%B0"><span class="top-box-text">实现</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#DLL-%E5%AF%B9%E5%A4%96%E6%8E%A5%E5%8F%A3"><span class="top-box-text">DLL 对外接口</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#Python-%E5%AF%B9%E6%8E%A5"><span class="top-box-text">Python 对接</span></a></li></ol></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2022/05/19/perf-memo/">
+          <h3 class="post-title">
+            下一篇：Perf 便笺
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+
+
+
+
+
+
+
+
+<footer>
+    <div class="site-footer">
+        <div class="social-container">
+            
+            
+            <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
+                <i class="icon icon-github"></i>
+            </a>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+        </div>
+        
+        Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a
+            href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+        
+        
+        
+        
+        
+        
+    </div>
+    <!-- mermaid -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            // 检查用户的首选颜色模式
+            const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            mermaid.initialize({
+                theme: isDarkMode ? 'neutral' : 'base'
+            });
+        }
+    </script>
+    <!-- diagrams -->
+    <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+    <style type="text/css">
+        @media (prefers-color-scheme: dark) {
+            svg {
+                filter: invert(93%) hue-rotate(180deg);
+                background-color: transparent !important;
+            }
+
+            image {
+                filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+            }
+        }
+
+        .mxgraph-container {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</footer>
+
+
+</div>
+</div>
+
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+</body>
+
+</html>
+

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>Perf 便笺</title>
+<meta name="keywords" content="Perf 便笺, ZYXeeker`s blog">
+<meta name="description" content="使用Linux perf Examples
+问题1. create_tasks 中编译出错builtin-sched.c: In function ‘create_tasks’:/home/z/WorkSpace/SKDL0401_TE/k">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="Perf 便笺">
+<meta property="og:description" content="使用Linux perf Examples
+问题1. create_tasks 中编译出错builtin-sched.c: In function ‘create_tasks’:/home/z/WorkSpace/SKDL0401_TE/k">
+
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://blog.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://blog.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">Perf 便笺</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2022-05-19</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/profile-perf-memo/">
+              profile,perf,memo
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <h1 id="使用"><a href="#使用" class="headerlink" title="使用"></a>使用</h1><p><a target="_blank" rel="noopener" href="https://www.brendangregg.com/perf.html">Linux perf Examples</a></p>
+<h1 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h1><h2 id="1-create-tasks-中编译出错"><a href="#1-create-tasks-中编译出错" class="headerlink" title="1. create_tasks 中编译出错"></a>1. <code>create_tasks</code> 中编译出错</h2><figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">builtin-sched.c: In function ‘create_tasks’:</span><br><span class="line">/home/z/WorkSpace/SKDL0401_TE/kernel/tools/include/linux/kernel.h:43:24: error: comparison of distinct pointer types lacks a cast [-Werror]</span><br><span class="line">   43 |         (void) (&amp;_max1 == &amp;_max2);              \</span><br><span class="line">      |                        ^~</span><br><span class="line">builtin-sched.c:673:34: note: in expansion of macro ‘max’</span><br><span class="line">  673 |                         (size_t) max(16 * 1024, PTHREAD_STACK_MIN));</span><br><span class="line">      |                                  ^~~</span><br></pre></td></tr></table></figure>
+<p><strong>解决：</strong><br>需要社区补丁：<br><a target="_blank" rel="noopener" href="https://kernel.googlesource.com/pub/scm/linux/kernel/git/tj/cgroup/+/d08c84e01afa7a7eee6badab25d5420fa847f783%5E%21/#F0">Diff - d08c84e01afa7a7eee6badab25d5420fa847f783^! - pub&#x2F;scm&#x2F;linux&#x2F;kernel&#x2F;git&#x2F;tj&#x2F;cgroup - Git at Google</a></p>
+<h1 id="Refer"><a href="#Refer" class="headerlink" title="Refer"></a>Refer</h1><p><a target="_blank" rel="noopener" href="https://saiyn.github.io/homepage/2017/11/26/perf/">调试技术之perf实战笔记</a><br><a target="_blank" rel="noopener" href="http://walkerdu.com/2018/09/13/perf-event/">性能分析利器之perf浅析 | 学海无涯，行者无疆</a><br><a target="_blank" rel="noopener" href="https://arthurchiao.art/blog/linux-tracing-basis-zh/">Linux tracing&#x2F;profiling 基础：符号表、调用栈、perf&#x2F;bpftrace 示例等（2022）</a></p>
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E4%BD%BF%E7%94%A8"><span class="top-box-text">使用</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E9%97%AE%E9%A2%98"><span class="top-box-text">问题</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#1-create-tasks-%E4%B8%AD%E7%BC%96%E8%AF%91%E5%87%BA%E9%94%99"><span class="top-box-text">1. create_tasks 中编译出错</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#Refer"><span class="top-box-text">Refer</span></a></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2022/01/05/gdb/">
+          <h3 class="post-title">
+            下一篇：GDB常用命令
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+
+
+
+
+
+
+
+
+<footer>
+    <div class="site-footer">
+        <div class="social-container">
+            
+            
+            <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
+                <i class="icon icon-github"></i>
+            </a>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+        </div>
+        
+        Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a
+            href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+        
+        
+        
+        
+        
+        
+    </div>
+    <!-- mermaid -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            // 检查用户的首选颜色模式
+            const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            mermaid.initialize({
+                theme: isDarkMode ? 'neutral' : 'base'
+            });
+        }
+    </script>
+    <!-- diagrams -->
+    <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+    <style type="text/css">
+        @media (prefers-color-scheme: dark) {
+            svg {
+                filter: invert(93%) hue-rotate(180deg);
+                background-color: transparent !important;
+            }
+
+            image {
+                filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+            }
+        }
+
+        .mxgraph-container {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</footer>
+
+
+</div>
+</div>
+
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+</body>
+
+</html>
+
