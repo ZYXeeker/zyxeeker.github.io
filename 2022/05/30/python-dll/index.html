@@ -11,12 +11,12 @@
 
 <title>Python调用DLL</title>
 <meta name="keywords" content="Python调用DLL, ZYXeeker`s blog">
-<meta name="description" content="背景算法组在对摄像头进行算法实现是用的 Python 来进行的模拟实现，但 Python 在调用对应的库进行操作时，出现了延迟过大的问题以及无法取到对应的数据导致业务逻辑无法实现，因此我这边编写了一个专门的 SDK 提供给算法组进行使用。这">
+<meta name="description" content="背景算法组在对摄像头进行算法实现是用的 Python 来进行的模拟实现，但 Python 在调用对应的库进行操作时出现了延迟过大的问题以及无法取到对应的数据导致业务逻辑无法实现，因此我这边编写了一个专门的 SDK 提供给算法组进行使用。这里">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta property="og:title" content="Python调用DLL">
-<meta property="og:description" content="背景算法组在对摄像头进行算法实现是用的 Python 来进行的模拟实现，但 Python 在调用对应的库进行操作时，出现了延迟过大的问题以及无法取到对应的数据导致业务逻辑无法实现，因此我这边编写了一个专门的 SDK 提供给算法组进行使用。这">
+<meta property="og:description" content="背景算法组在对摄像头进行算法实现是用的 Python 来进行的模拟实现，但 Python 在调用对应的库进行操作时出现了延迟过大的问题以及无法取到对应的数据导致业务逻辑无法实现，因此我这边编写了一个专门的 SDK 提供给算法组进行使用。这里">
 
 <link rel="shortcut icon" href="/favicon.ico">
 <link rel="stylesheet" href="/style/main.css">
@@ -93,7 +93,7 @@
       </div>
       <div class="post-content-wrapper">
         <div class="post-content">
-          <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>算法组在对摄像头进行算法实现是用的 <em>Python</em> 来进行的模拟实现，但 <em>Python</em> 在调用对应的库进行操作时，出现了延迟过大的问题以及无法取到对应的数据导致业务逻辑无法实现，因此我这边编写了一个专门的 SDK 提供给算法组进行使用。这里主要是记录下 <em>Python</em> 如何调用DLL</p>
+          <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>算法组在对摄像头进行算法实现是用的 <em>Python</em> 来进行的模拟实现，但 <em>Python</em> 在调用对应的库进行操作时出现了延迟过大的问题以及无法取到对应的数据导致业务逻辑无法实现，因此我这边编写了一个专门的 SDK 提供给算法组进行使用。这里主要是记录下 <em>Python</em> 如何调用DLL</p>
 <h1 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h1><h2 id="DLL-对外接口"><a href="#DLL-对外接口" class="headerlink" title="DLL 对外接口"></a>DLL 对外接口</h2><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> PY_CAPTURE_H_</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> PY_CAPTURE_H_</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> DLLEXPORT extern <span class="string">&quot;C&quot;</span> __declspec(dllexport)</span></span><br><span class="line"></span><br><span class="line"><span class="function">DLLEXPORT <span class="type">void</span> <span class="title">init</span><span class="params">(<span class="type">int</span> w, <span class="type">int</span> h, <span class="type">char</span> *name)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function">DLLEXPORT <span class="type">void</span> <span class="title">start</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function">DLLEXPORT <span class="type">void</span> <span class="title">stop</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function">DLLEXPORT <span class="type">unsigned</span> <span class="type">char</span> *<span class="title">get_frame</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function">DLLEXPORT <span class="type">void</span> <span class="title">save_frame</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *path)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span> <span class="comment">//PY_CAPTURE_H_</span></span></span><br></pre></td></tr></table></figure>
 <h2 id="Python-对接"><a href="#Python-对接" class="headerlink" title="Python 对接"></a><em>Python</em> 对接</h2><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">import</span> ctypes, cv2, os</span><br><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="comment"># 示例dll路径</span></span><br><span class="line">os.add_dll_directory(<span class="string">r&quot;D:\\&quot;</span>)</span><br><span class="line">lib = ctypes.cdll.LoadLibrary(<span class="string">r&quot;D:\SDK\CaptrueSdk.dll&quot;</span>)</span><br><span class="line"><span class="comment"># init 中输入分辨率大小和设备名</span></span><br><span class="line">lib.init(<span class="number">1280</span>, <span class="number">720</span>, <span class="string">b&quot;UVC Camera&quot;</span>)</span><br><span class="line"><span class="comment"># 开始捕获视频流</span></span><br><span class="line">lib.start()</span><br><span class="line"><span class="comment"># 定义返回类型</span></span><br><span class="line">lib.get_frame.restype = ctypes.POINTER(ctypes.c_uint16)</span><br><span class="line">pointer = lib.get_frame()</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">    pointer = lib.get_frame()</span><br><span class="line">    _src = np.asarray(np.fromiter(pointer, dtype=np.uint16, count=<span class="number">1280</span> * <span class="number">720</span>))</span><br><span class="line">    src = _src.reshape((<span class="number">720</span>, <span class="number">1280</span>))</span><br><span class="line">    <span class="comment"># 保存frame</span></span><br><span class="line">    lib.save_frame()</span><br><span class="line">    <span class="comment"># 灰度化</span></span><br><span class="line">    img = cv2.cvtColor(((src / src.<span class="built_in">max</span>()) * <span class="number">255</span>).astype(np.uint8), cv2.COLOR_GRAY2BGR)</span><br><span class="line">    image = np.array(img)</span><br><span class="line">    <span class="comment"># 预览视频</span></span><br><span class="line">    cv2.imshow(<span class="string">&quot;RAW&quot;</span>, image)</span><br><span class="line">    cv2.waitKey(<span class="number">1</span>)</span><br></pre></td></tr></table></figure>
         </div>
@@ -117,7 +117,28 @@
   </div>
 
 
+    <div id="gitalk-container"></div>
 
+
+
+    <link rel="stylesheet" href="/style/gitalk.min.css"/>
+    <script src="/js/gitalk.min.js"></script>
+    <script>
+        const config = {"clientId":"Ov23liAaBdqPOptgU406","clientSecret":"d5e5f547880febc669e145d927930d3648027b42","repository":"gitalk","owner":"zyxeeker","createIssueManually":true};
+        const gitalk = new Gitalk({
+            clientID: config.clientId,
+            clientSecret: config.clientSecret,
+            repo: config.repository,
+            owner: config.owner,
+            admin: [config.owner],
+            id: location.pathname.slice(1, location.pathname.lastIndexOf('/')).substring(0, 49),       // Ensure uniqueness and length less than 50
+            distractionFreeMode: false,  // Facebook-like distraction free mode
+            createIssueManually: config.createIssueManually ? true : false
+        });
+
+        gitalk.render('gitalk-container')
+
+    </script>
 
 
 

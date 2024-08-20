@@ -77,7 +77,7 @@
 
   <div class="current-tag-container">
     <h2 class="title">
-      <i class="icon icon-pricetags-outline"></i> 内存管理, 汇编
+      <i class="icon icon-pricetags-outline"></i> ARM
     </h2>
   </div>
 
@@ -85,28 +85,90 @@
 
 <section class="post-item">
     <div class="content">
-      <a href="/2024/06/28/asm-func-stack/">
-        <h2 class="post-title">汇编-函数与栈</h2>
+      <a href="/2024/05/20/arm-processes-tz/">
+        <h2 class="post-title">Arm下多进程时区问题</h2>
       </a>
-      <a href="/2024/06/28/asm-func-stack/">
+      <a href="/2024/05/20/arm-processes-tz/">
           <div class="post-abstract">
             
 			    
-环境依据：Ubuntu2204 x64gcc version 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04)
+版本依据Glibc-2.33, Kernel-5.10.117
 
-记录 C 中栈对函数的管理
-DEMO示例代码int test1(int a, int b) &#1
+对于不需要时间同步的情况来说，在程序运行前 env 中设置好 TZ 的相关参数即可，这里主要记录存在 NTP 服务情况下的处理方式
+问题？在多进程下，NTP 由另一个应用的
             
           </div>
       </a>
       <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-06-28</span>
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-20</span>
         
           <span>
             <i class="icon icon-pricetags-outline"></i>
             
 
-                内存管理, 汇编
+                ARM
+                
+                  ，
+                
+            
+
+                Linux
+                
+                  ，
+                
+            
+
+                Kernel
+                
+                  ，
+                
+            
+
+                Glibc
+                
+            
+          </span>
+        
+      </div>
+    </div>
+  </section>
+
+
+
+<section class="post-item">
+    <div class="content">
+      <a href="/2024/05/16/arm-arch/">
+        <h2 class="post-title">嵌入式下多应用架构</h2>
+      </a>
+      <a href="/2024/05/16/arm-arch/">
+          <div class="post-abstract">
+            
+			    单体应用时间带来的变化在早期的业务中嵌入式应用中只需要简单的对设备上的硬件资源进行整合和调用，并将需要的数据传递给上层设备交予其中的应用进行解析和应用，所以当时的结构及其简单：
+flowchart TB
+    subgraph Devic
+            
+          </div>
+      </a>
+      <div class="post-info">
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-16</span>
+        
+          <span>
+            <i class="icon icon-pricetags-outline"></i>
+            
+
+                ARM
+                
+                  ，
+                
+            
+
+                Arch
+                
+                  ，
+                
+            
+
+                Linux
                 
             
           </span>

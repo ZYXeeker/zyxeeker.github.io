@@ -77,7 +77,7 @@
 
   <div class="current-tag-container">
     <h2 class="title">
-      <i class="icon icon-pricetags-outline"></i> docker,C++
+      <i class="icon icon-pricetags-outline"></i> Glibc
     </h2>
   </div>
 
@@ -85,24 +85,46 @@
 
 <section class="post-item">
     <div class="content">
-      <a href="/2021/07/27/clion-with-docker/">
-        <h2 class="post-title">CLion连接Docker</h2>
+      <a href="/2024/05/20/arm-processes-tz/">
+        <h2 class="post-title">Arm下多进程时区问题</h2>
       </a>
-      <a href="/2021/07/27/clion-with-docker/">
+      <a href="/2024/05/20/arm-processes-tz/">
           <div class="post-abstract">
             
-			    配置 Docker创建 DockerfileFROM ubuntu:18.04ENV DEBIAN_FRONTEND=noninteractive# 更换ubuntu的源RUN echo &quot;deb http://mirrors.a
+			    
+版本依据Glibc-2.33, Kernel-5.10.117
+
+对于不需要时间同步的情况来说，在程序运行前 env 中设置好 TZ 的相关参数即可，这里主要记录存在 NTP 服务情况下的处理方式
+问题？在多进程下，NTP 由另一个应用的
             
           </div>
       </a>
       <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2021-07-27</span>
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-20</span>
         
           <span>
             <i class="icon icon-pricetags-outline"></i>
             
 
-                docker,C++
+                ARM
+                
+                  ，
+                
+            
+
+                Linux
+                
+                  ，
+                
+            
+
+                Kernel
+                
+                  ，
+                
+            
+
+                Glibc
                 
             
           </span>

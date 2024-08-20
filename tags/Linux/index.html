@@ -73,68 +73,53 @@
 
 
 
-  <div class="content-container">
+<div class="content-container">
 
-    
+  <div class="current-tag-container">
+    <h2 class="title">
+      <i class="icon icon-pricetags-outline"></i> Linux
+    </h2>
+  </div>
+
+  
 
 <section class="post-item">
     <div class="content">
-      <a href="/2022/05/30/python-dll/">
-        <h2 class="post-title">Python调用DLL</h2>
+      <a href="/2024/07/16/live555-perf/">
+        <h2 class="post-title">LIVE555性能分析&amp;优化</h2>
       </a>
-      <a href="/2022/05/30/python-dll/">
+      <a href="/2024/07/16/live555-perf/">
           <div class="post-abstract">
             
-			    背景算法组在对摄像头进行算法实现是用的 Python 来进行的模拟实现，但 Python 在调用对应的库进行操作时出现了延迟过大的问题以及无法取到对应的数据导致业务逻辑无法实现，因此我这边编写了一个专门的 SDK 提供给算法组进行使用。这里
+			    
+版本依据Kernel-5.10.117 , live555-2020
+
+
+live555 作为一款 RTSP 开源库被广泛的应用在各种项目中间，但它并不是一个多线程库，虽然单线程应用在响应上具有一定的优势，但作为一个库融入到其他应用中时难
             
           </div>
       </a>
       <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2022-05-30</span>
+        <span><i class="icon icon-calendar-outline"></i> 2024-07-16</span>
         
           <span>
             <i class="icon icon-pricetags-outline"></i>
             
 
-                SDK
+                Linux
+                
+                  ，
                 
             
-          </span>
-        
-      </div>
-    </div>
-  </section>
 
-
-
-<section class="post-item">
-    <div class="content">
-      <a href="/2022/05/19/perf-memo/">
-        <h2 class="post-title">Perf 便笺</h2>
-      </a>
-      <a href="/2022/05/19/perf-memo/">
-          <div class="post-abstract">
-            
-			    使用Linux perf Examples
-问题1. create_tasks 中编译出错builtin-sched.c: In function ‘create_tasks’:/home/z/WorkSpace/SKDL0401_TE/k
-            
-          </div>
-      </a>
-      <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2022-05-19</span>
-        
-          <span>
-            <i class="icon icon-pricetags-outline"></i>
+                Kernel
+                
+                  ，
+                
             
 
                 Perf
                 
-                  ，
-                
-            
-
-                memo
-                
             
           </span>
         
@@ -146,36 +131,46 @@
 
 <section class="post-item">
     <div class="content">
-      <a href="/2022/01/05/gdb/">
-        <h2 class="post-title">GDB常用命令</h2>
+      <a href="/2024/05/20/arm-processes-tz/">
+        <h2 class="post-title">Arm下多进程时区问题</h2>
       </a>
-      <a href="/2022/01/05/gdb/">
+      <a href="/2024/05/20/arm-processes-tz/">
           <div class="post-abstract">
             
 			    
-转载至GDB调试-从入门实践到原理
+版本依据Glibc-2.33, Kernel-5.10.117
 
-
-gcc -g t1.c -o t1
-需要加 -g 来产生调试符号, 否则GDB会出现 Make breakpoint pending on future shared library load?
-断
+对于不需要时间同步的情况来说，在程序运行前 env 中设置好 TZ 的相关参数即可，这里主要记录存在 NTP 服务情况下的处理方式
+问题？在多进程下，NTP 由另一个应用的
             
           </div>
       </a>
       <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2022-01-05</span>
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-20</span>
         
           <span>
             <i class="icon icon-pricetags-outline"></i>
             
 
-                笔记
+                ARM
                 
                   ，
                 
             
 
-                GDB
+                Linux
+                
+                  ，
+                
+            
+
+                Kernel
+                
+                  ，
+                
+            
+
+                Glibc
                 
             
           </span>
@@ -188,69 +183,38 @@ gcc -g t1.c -o t1
 
 <section class="post-item">
     <div class="content">
-      <a href="/2021/11/20/mutex-vs-semaphore/">
-        <h2 class="post-title">Mutex vs. Semaphore, what is the difference?</h2>
+      <a href="/2024/05/16/arm-arch/">
+        <h2 class="post-title">嵌入式下多应用架构</h2>
       </a>
-      <a href="/2021/11/20/mutex-vs-semaphore/">
+      <a href="/2024/05/16/arm-arch/">
           <div class="post-abstract">
             
-			    
-Mutex vs. SemaphoreThe Toilet Example  (c) Copyright 2005, Niclas Winquist ;)
-
-MutexIs a key to a toilet. One person ca
+			    单体应用时间带来的变化在早期的业务中嵌入式应用中只需要简单的对设备上的硬件资源进行整合和调用，并将需要的数据传递给上层设备交予其中的应用进行解析和应用，所以当时的结构及其简单：
+flowchart TB
+    subgraph Devic
             
           </div>
       </a>
       <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2021-11-20</span>
+        <span><i class="icon icon-calendar-outline"></i> 2024-05-16</span>
         
           <span>
             <i class="icon icon-pricetags-outline"></i>
             
 
-                笔记
+                ARM
                 
                   ，
                 
             
 
-                Async
-                
-            
-          </span>
-        
-      </div>
-    </div>
-  </section>
-
-
-
-<section class="post-item">
-    <div class="content">
-      <a href="/2021/07/27/clion-with-docker/">
-        <h2 class="post-title">CLion连接Docker</h2>
-      </a>
-      <a href="/2021/07/27/clion-with-docker/">
-          <div class="post-abstract">
-            
-			    配置 Docker创建 DockerfileFROM ubuntu:18.04ENV DEBIAN_FRONTEND=noninteractive# 更换ubuntu的源RUN echo &quot;deb http://mirrors.a
-            
-          </div>
-      </a>
-      <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2021-07-27</span>
-        
-          <span>
-            <i class="icon icon-pricetags-outline"></i>
-            
-
-                C++
+                Arch
                 
                   ，
                 
             
 
-                docker
+                Linux
                 
             
           </span>
@@ -262,16 +226,9 @@ MutexIs a key to a toilet. One person ca
 
 
 
-    <div class="pagination-container">
-      
-        <a href="/" class="prev"><i class="icon icon-arrow-ios-back-outline"></i> 上一页</a>
-      
-      
-    </div>
 
 
-
-  </div>
+</div>
 
 <footer>
     <div class="site-footer">
