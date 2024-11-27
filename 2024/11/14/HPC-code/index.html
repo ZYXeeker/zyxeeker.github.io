@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>程序性能优化 —— 过程优化</title>
+<meta name="keywords" content="程序性能优化 —— 过程优化, ZYXeeker`s blog">
+<meta name="description" content="
+CSAPP + 「程序性能优化理论与方法」一些笔记由于作者是使用的 X86 平台进行的测试，考虑到手上实际的设备和环境，这些更偏向于理论硬件 &amp; 版本依据：ARM A53，ARM GCC 11.1.0
+
+前言虽然通过指定编译器的优">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="程序性能优化 —— 过程优化">
+<meta property="og:description" content="
+CSAPP + 「程序性能优化理论与方法」一些笔记由于作者是使用的 X86 平台进行的测试，考虑到手上实际的设备和环境，这些更偏向于理论硬件 &amp; 版本依据：ARM A53，ARM GCC 11.1.0
+
+前言虽然通过指定编译器的优">
+
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://blog.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://blog.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/memo" class="menu purple-link">
+        便笺
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">程序性能优化 —— 过程优化</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2024-11-14</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/HPC/">
+              HPC
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <blockquote>
+<p>CSAPP + 「程序性能优化理论与方法」一些笔记<br>由于作者是使用的 X86 平台进行的测试，考虑到手上实际的设备和环境，这些更偏向于理论<br>硬件 &amp; 版本依据：ARM A53，ARM GCC 11.1.0</p>
+</blockquote>
+<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>虽然通过指定编译器的优化等级可以对代码进行优化，但其优化具有局限性：</p>
+<ul>
+<li>优化行为会受到基本的约束<ul>
+<li>必须保证对程序的行为不产生影响</li>
+<li>通常会阻止将程序行为引向不利的情况这类优化</li>
+</ul>
+</li>
+<li>某些行为对于开发者来说可能是明确的，但编译器来说可能会受到语言和代码风格的影响</li>
+<li>大部分优化分析只是基于执行的步骤<ul>
+<li>在大多数情况下不会对整个程序进行优化分析</li>
+<li>GCC做<em>过程间优化</em>也只是基于单文件进行</li>
+</ul>
+</li>
+<li>大部分优化是基于静态分析进行</li>
+<li>在具有不确定行为时，编译器只做保守的优化<br>因此优化最好的方式依然是进行手动优化，如果编译器没有进行预期的优化那么依然需要从代码出发</li>
+</ul>
+<h1 id="方法"><a href="#方法" class="headerlink" title="方法"></a>方法</h1><h2 id="别名消除（Memory-Aliasing）"><a href="#别名消除（Memory-Aliasing）" class="headerlink" title="别名消除（Memory Aliasing）"></a>别名消除（<em>Memory Aliasing</em>）</h2><p>内存别名，即同一个地址被多个变量引用，导致编译器会认为这些变量与上下文存在依赖关系从而影响优化。比如 CSAPP 中的例子：</p>
+<div style="display: flex;justify-content : center;align-items: center;">
+<pre>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">loop</span><span class="params">(<span class="type">int</span>* a, <span class="type">int</span>* b, <span class="type">int</span> n)</span> &#123;</span><br><span class="line">  <span class="type">int</span> i, j;</span><br><span class="line">  <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; n; i++) &#123;</span><br><span class="line">    a[i] = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; n; j++) &#123;</span><br><span class="line">      a[i] += b[j] + <span class="number">10</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</pre>
+<div>
+➡
+</div>
+<pre>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">loop_better</span><span class="params">(<span class="type">int</span>* a, <span class="type">int</span>* b, <span class="type">int</span> n)</span> &#123;</span><br><span class="line">  <span class="type">int</span> i, j, val;</span><br><span class="line">  <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; n; i++) &#123;</span><br><span class="line">    val = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; n; j++) &#123;</span><br><span class="line">      val += b[j] + <span class="number">10</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    a[i] = val;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</pre>
+</div>
+
+<p>使用 <em>-O1</em> 进行优化：</p>
+<div style="display: flex;justify-content : center;">
+<pre>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">loop(int*, int*, int):</span><br><span class="line">        push    &#123;r4, r5, lr&#125;</span><br><span class="line">        subs    lr, r2, #0</span><br><span class="line">        ble     .L1</span><br><span class="line">        mov     r4, r1</span><br><span class="line">        mov     ip, r0</span><br><span class="line">        lsl     lr, lr, #2</span><br><span class="line">        add     r1, r0, lr</span><br><span class="line">        add     lr, lr, r4</span><br><span class="line">        movs    r5, #0</span><br><span class="line">.L4:</span><br><span class="line">        str     r5, [ip], #4</span><br><span class="line">        mov     r0, r4</span><br><span class="line">.L3:</span><br><span class="line">        ldr     r2, [r0], #4</span><br><span class="line">        adds    r2, r2, #10</span><br><span class="line">        ldr     r3, [ip, #-4]</span><br><span class="line">        add     r3, r3, r2</span><br><span class="line">        str     r3, [ip, #-4]</span><br><span class="line">        cmp     r0, lr</span><br><span class="line">        bne     .L3</span><br><span class="line">        cmp     ip, r1</span><br><span class="line">        bne     .L4</span><br><span class="line">.L1:</span><br><span class="line">        pop     &#123;r4, r5, pc&#125;</span><br></pre></td></tr></table></figure>
+</pre>
+<div style="height:100%;align-self: center;">
+➡
+</div>
+<pre>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">loop_better(int*, int*, int):</span><br><span class="line">        subs    ip, r2, #0</span><br><span class="line">        ble     .L7</span><br><span class="line">        push    &#123;r4, lr&#125;</span><br><span class="line">        mov     r4, r1</span><br><span class="line">        mov     lr, r0</span><br><span class="line">        lsl     ip, ip, #2</span><br><span class="line">        add     r1, r0, ip</span><br><span class="line">        add     ip, ip, r4</span><br><span class="line">.L3:</span><br><span class="line">        mov     r2, r4</span><br><span class="line">        movs    r0, #0</span><br><span class="line">.L4:</span><br><span class="line">        ldr     r3, [r2], #4</span><br><span class="line">        adds    r3, r3, #10</span><br><span class="line">        add     r0, r0, r3</span><br><span class="line">        cmp     r2, ip</span><br><span class="line">        bne     .L4</span><br><span class="line">        str     r0, [lr], #4</span><br><span class="line">        cmp     lr, r1</span><br><span class="line">        bne     .L3</span><br><span class="line">        pop     &#123;r4, pc&#125;</span><br><span class="line">.L7:</span><br><span class="line">        bx      lr</span><br></pre></td></tr></table></figure>
+</pre>
+</div>
+
+<p>和预期一样，<code>loop_better()</code> 取得了更好的效果，<em>LOAD</em> 与 <em>STORE</em> 操作由原来的 <code>2n</code> 减少到了 <code>n</code> 次。如果采用更高的优化等级会怎么样？使用 <em>-O2</em>，*-O3* 分别进行优化：</p>
+<div style="display: flex;justify-content : center;">
+<pre>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">-O2 -O3</span></span><br><span class="line">loop(int*, int*, int):</span><br><span class="line">        push    &#123;r4, r5, lr&#125;</span><br><span class="line">        subs    lr, r2, #0</span><br><span class="line">        ble     .L1</span><br><span class="line">        lsl     lr, lr, #2</span><br><span class="line">        movs    r4, #0</span><br><span class="line">        add     r5, r0, lr</span><br><span class="line">        add     lr, lr, r1</span><br><span class="line">.L4:</span><br><span class="line">        mov     ip, r1</span><br><span class="line">        movs    r2, #0</span><br><span class="line">        str     r4, [r0], #4</span><br><span class="line">.L3:</span><br><span class="line">        ldr     r3, [ip], #4</span><br><span class="line">        adds    r3, r3, #10</span><br><span class="line">        cmp     lr, ip</span><br><span class="line">        add     r2, r2, r3</span><br><span class="line">        str     r2, [r0, #-4]</span><br><span class="line">        bne     .L3</span><br><span class="line">        cmp     r0, r5</span><br><span class="line">        bne     .L4</span><br><span class="line">.L1:</span><br><span class="line">        pop     &#123;r4, r5, pc&#125;</span><br></pre></td></tr></table></figure>
+</pre>
+<div style="border-left: 2px solid white;margin: 10px;"></div>
+<pre>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">-O2</span></span><br><span class="line">loop_better(int*, int*, int):</span><br><span class="line">        subs    ip, r2, #0</span><br><span class="line">        ble     .L7</span><br><span class="line">        push    &#123;r4, lr&#125;</span><br><span class="line">        mov     r4, r1</span><br><span class="line">        mov     lr, r0</span><br><span class="line">        lsl     ip, ip, #2</span><br><span class="line">        add     r1, r0, ip</span><br><span class="line">        add     ip, ip, r4</span><br><span class="line">.L3:</span><br><span class="line">        mov     r2, r4</span><br><span class="line">        movs    r0, #0</span><br><span class="line">.L4:</span><br><span class="line">        ldr     r3, [r2], #4</span><br><span class="line">        adds    r3, r3, #10</span><br><span class="line">        add     r0, r0, r3</span><br><span class="line">        cmp     r2, ip</span><br><span class="line">        bne     .L4</span><br><span class="line">        str     r0, [lr], #4</span><br><span class="line">        cmp     lr, r1</span><br><span class="line">        bne     .L3</span><br><span class="line">        pop     &#123;r4, pc&#125;</span><br><span class="line">.L7:</span><br><span class="line">        bx      lr</span><br></pre></td></tr></table></figure>
+</pre>
+<div style="border-left: 2px dashed grey;margin: 10px;"></div>
+<pre>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">-O3</span></span><br><span class="line">loop_better(int*, int*, int):</span><br><span class="line">        push    &#123;r4, r5, r6, r7, r8, r9, r10, lr&#125;</span><br><span class="line">        mov     r4, r1</span><br><span class="line">        subs    r1, r2, #0</span><br><span class="line">        ble     .L1</span><br><span class="line">        lsrs    r2, r1, #2</span><br><span class="line">        mov     ip, r0</span><br><span class="line">        vmov.i32        q10, #10  @ v4si</span><br><span class="line">        add     r7, r0, r1, lsl #2</span><br><span class="line">        add     r10, r1, #-1</span><br><span class="line">        add     r2, r4, r2, lsl #4</span><br><span class="line">        bic     r5, r1, #3</span><br><span class="line">.L3:</span><br><span class="line">        cmp     r10, #2</span><br><span class="line">        bls     .L8</span><br><span class="line">        vmov.i32        q9, #0  @ v4si</span><br><span class="line">        mov     r3, r4</span><br><span class="line">.L5:</span><br><span class="line">        vld1.32 &#123;q8&#125;, [r3]!</span><br><span class="line">        vadd.i32        q8, q8, q10</span><br><span class="line">        cmp     r2, r3</span><br><span class="line">        vadd.i32        q9, q9, q8</span><br><span class="line">        bne     .L5</span><br><span class="line">        vadd.i32        d18, d18, d19</span><br><span class="line">        cmp     r5, r1</span><br><span class="line">        it      ne</span><br><span class="line">        movne   r0, r5</span><br><span class="line">        vpadd.i32       d18, d18, d18</span><br><span class="line">        vmov.32 r3, d18[0]</span><br><span class="line">        beq     .L4</span><br><span class="line">.L7:</span><br><span class="line">        ldr     r6, [r4, r0, lsl #2]</span><br><span class="line">        add     r8, r0, #1</span><br><span class="line">        lsl     lr, r0, #2</span><br><span class="line">        cmp     r1, r8</span><br><span class="line">        add     r9, r6, #10</span><br><span class="line">        add     r3, r3, r9</span><br><span class="line">        ble     .L4</span><br><span class="line">        add     lr, lr, r4</span><br><span class="line">        adds    r0, r0, #2</span><br><span class="line">        cmp     r1, r0</span><br><span class="line">        ldr     r6, [lr, #4]</span><br><span class="line">        add     r8, r6, #10</span><br><span class="line">        add     r3, r3, r8</span><br><span class="line">        ble     .L4</span><br><span class="line">        ldr     r0, [lr, #8]</span><br><span class="line">        adds    r0, r0, #10</span><br><span class="line">        add     r3, r3, r0</span><br><span class="line">.L4:</span><br><span class="line">        str     r3, [ip], #4</span><br><span class="line">        cmp     ip, r7</span><br><span class="line">        bne     .L3</span><br><span class="line">.L1:</span><br><span class="line">        pop     &#123;r4, r5, r6, r7, r8, r9, r10, pc&#125;</span><br><span class="line">.L8:</span><br><span class="line">        movs    r3, #0</span><br><span class="line">        mov     r0, r3</span><br><span class="line">        b       .L7</span><br></pre></td></tr></table></figure>
+</pre>
+</div>
+
+<p><code>loop()</code> 采用 <em>-O2</em>，*-O3* 优化后汇编结果相同，而 <code>loop_better()</code> 则会进一步采用并行操作对循环进行向量化优化。同时 <code>loop()</code> 中并没有得到很好的优化，它通过使用 <em>R2</em> 存储计算结果，最后将寄存器的值更新到对应的内存上，看起来减少了 <em>LOAD</em> 操作，但实际上 <em>STORE</em> 操作依然存在 <em>2n</em> 次，并未达到最优。因此仍然需要从代码上出发进行修改来达到最优<br>C 中存在 <code>restrict</code> 关键字来让编译器避免别名问题，但 C++ 中没有该关键字，所以考虑的修改方式最好是通过临时变量来进行更好的优化</p>
+<h2 id="常数传播"><a href="#常数传播" class="headerlink" title="常数传播"></a>常数传播</h2><p>常数传播是指替代表达式中已知常数的过程。这项事情一般在编译期时进行，但在某些时候编译器面对复杂的控制流程可能不能将所有的情况识别出来，从而导致进行一些不必要的计算。因此，手动进行传播优化是很有必要的<br>C++ 中可以使用 <code>constexpr</code> 让编译器在编译器进行对应的处理，C 自从 <a target="_blank" rel="noopener" href="https://en.cppreference.com/w/c/language/constexpr">constexpr specifier (since C23) - cppreference.com</a> 后才引入该关键字，所以 C 需要开发在一定情况下进行手动优化</p>
+<h2 id="传参优化"><a href="#传参优化" class="headerlink" title="传参优化"></a>传参优化</h2><p>函数的参数传递是通过寄存器与栈进行传递，参数数量如果超出可使用寄存器的数量后会将多余的参数通过压栈的方式进行传递。因此，将大量的参数组合成对应的结构体往往能够进行更高效的访问处理<br>对于不同的架构，可供使用传参的寄存器数量是不一样的，比如 <em>ArmV7</em>，<em>R0-R3</em> 一般作为参数传递：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">func</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b, <span class="type">int</span> c, <span class="type">int</span> d, <span class="type">int</span> e)</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> a + b + c + d + e;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">func_caller</span><span class="params">()</span> &#123;</span><br><span class="line">  func(<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>汇编结果：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">func(int, int, int, int, int):</span><br><span class="line">        push    &#123;r7&#125;</span><br><span class="line">        sub     sp, sp, #20</span><br><span class="line">        add     r7, sp, #0</span><br><span class="line">        str     r0, [r7, #12]</span><br><span class="line">        str     r1, [r7, #8]</span><br><span class="line">        str     r2, [r7, #4]</span><br><span class="line">        str     r3, [r7]</span><br><span class="line">        ldr     r2, [r7, #12]</span><br><span class="line">        ldr     r3, [r7, #8]</span><br><span class="line">        add     r2, r2, r3</span><br><span class="line">        ldr     r3, [r7, #4]</span><br><span class="line">        add     r2, r2, r3</span><br><span class="line">        ldr     r3, [r7]</span><br><span class="line">        add     r2, r2, r3</span><br><span class="line">        ldr     r3, [r7, #24]</span><br><span class="line">        add     r3, r3, r2</span><br><span class="line">        mov     r0, r3</span><br><span class="line">        adds    r7, r7, #20</span><br><span class="line">        mov     sp, r7</span><br><span class="line">        ldr     r7, [sp], #4</span><br><span class="line">        bx      lr</span><br><span class="line">func_caller():</span><br><span class="line">        push    &#123;r7, lr&#125;</span><br><span class="line">        sub     sp, sp, #8</span><br><span class="line">        add     r7, sp, #8</span><br><span class="line">        movs    r3, #5</span><br><span class="line">        str     r3, [sp]</span><br><span class="line">        movs    r3, #4</span><br><span class="line">        movs    r2, #3</span><br><span class="line">        movs    r1, #2</span><br><span class="line">        movs    r0, #1</span><br><span class="line">        bl      func(int, int, int, int, int)</span><br><span class="line">        nop</span><br><span class="line">        mov     sp, r7</span><br><span class="line">        pop     &#123;r7, pc&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看出，当超出 <em>R0-R3</em> 后，<code>5</code> 会被压入到栈底，进入到 <code>func()</code> 中寄存器的值会被临时保存到栈中然后再进行后续的操作。因此使用结构体将参数进行组合，会是一个更好的优化方式，毕竟访问寄存器的速度远远高于访问内存的速度</p>
+<h2 id="内联替换"><a href="#内联替换" class="headerlink" title="内联替换"></a>内联替换</h2><p>函数的跳转切换需要对上下文的状态进行保存，这其中就会存在如下这四个步骤：</p>
+<pre class="mermaid">flowchart LR
+    saveCtx(保存上下文) --> jmp(跳转执行)
+    jmp --> return(返回调用处)
+    return --> recoveryCtx(恢复上下文)</pre>
+
+<p>因此函数的调用过程就会产生开销，可以通过宏和 <code>inline</code> 关键字进行优化处理，但并不是所有的函数都可以通过内联的方式来进行处理，大体量的函数如果被内联进去反而会导致较差的效果</p>
+<h2 id="全局变量"><a href="#全局变量" class="headerlink" title="全局变量"></a>全局变量</h2><p>在多个文件间共享的全局变量对于编译器来说进行优化分析是十分不利的，对于这种情况，编译器的优化通常是十分保守的，所以在一定的情况下应尽量避免使用全局变量，而且在并行编程中，对全局变量的修改也需要考虑如何协调其他消费者的状态同步<br>如果需要通过使用全局变量的方式来进行处理，按照 <em>Linux</em> 的 <em>API</em> 风格是最好的做法</p>
+<h2 id="语句级优化"><a href="#语句级优化" class="headerlink" title="语句级优化"></a>语句级优化</h2><h3 id="1-删除冗余语句"><a href="#1-删除冗余语句" class="headerlink" title="1. 删除冗余语句"></a>1. 删除冗余语句</h3><p>代码中可能存在一些死代码，这也会导致编译器无法进行合适的优化。通常情况下编译器会以 <code>unused-xx</code> 相关的警告来进行提示并在编译器将其丢弃</p>
+<h3 id="2-代数变换"><a href="#2-代数变换" class="headerlink" title="2. 代数变换"></a>2. 代数变换</h3><p>进一步简化计算语句也有利于编译优化的进行，编译器对于代数变换并不敏感，尤其是含有控制依赖的情况。所以如果有代数变换的表达式应该尽量对代数运算进行优化</p>
+<h3 id="3-去除相关性"><a href="#3-去除相关性" class="headerlink" title="3. 去除相关性"></a>3. 去除相关性</h3><p>去除相关性是为了让编译器进行更好的优化，何为依赖关系？若操作A必须先于B发生，那么就称B依赖于A，那么A与B就存在依赖关系<br>依赖关系的存在不利于编译器进行语句移动以及向量化等优化方式的展开，因此需要开发人员对依赖关系进行破除，帮助编译器进行更好的优化<br>依赖关系分为<strong>数据依赖</strong>和<strong>控制依赖</strong>两种类型<br>数据依赖是指<u>两个操作访问同一个变量，且这两个操作中有一个写操作</u>，大概分为三种：</p>
+<table>
+<thead>
+<tr>
+<th>依赖关系</th>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>真依赖</td>
+<td><code>a = 1; b = a;</code></td>
+<td>对 <code>a</code> 进行先写后读</td>
+</tr>
+<tr>
+<td>输出依赖</td>
+<td><code>a = 1; a = 2;</code></td>
+<td>对 <code>a</code> 进行先写后写</td>
+</tr>
+<tr>
+<td>反依赖</td>
+<td><code>a = b; b = 1;</code></td>
+<td>对 <code>b</code> 进行先读后写</td>
+</tr>
+</tbody></table>
+<p>书上将这三种依赖又分为真依赖和伪依赖（输出依赖，反依赖），不过这里分为强依赖和弱依赖感觉更加合适：</p>
+<ul>
+<li>强依赖（真依赖）：语句间出现了先后的数据值传递，不容易消除</li>
+<li>弱依赖（输出依赖，反依赖）：语句间没有引发数据值的传递，比较容易消除</li>
+</ul>
+<p>控制依赖是由程序的控制结构所引起，比如：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">func</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (a &gt; b)                <span class="comment">// S1</span></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;%d\n&quot;</span>, a);      <span class="comment">// S2</span></span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里的 <em>S2</em> 是否执行完全依赖于 <em>S1</em> 的判断结果<br>有一些常用方法</p>
+<h4 id="1-标量扩展"><a href="#1-标量扩展" class="headerlink" title="1. 标量扩展"></a>1. 标量扩展</h4><p>在 C&#x2F;C++ 中常见的变量类型均属于标量，标量扩展则是将循环中的标量引用转换成临时数组进行替换，这样有利于编译器对循环进一步向量化：</p>
+<div style="display: flex;justify-content : center;align-items: center;">
+<pre>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">func</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="type">int</span> A[<span class="number">10</span>] = </span><br><span class="line">    &#123; <span class="number">1</span>, <span class="number">22</span>, <span class="number">333</span>, <span class="number">4444</span>, <span class="number">55555</span>, <span class="number">413</span>, <span class="number">2333</span>, <span class="number">122</span>, <span class="number">1999</span>, <span class="number">10</span> &#125;;</span><br><span class="line">  <span class="type">int</span> N = <span class="keyword">sizeof</span>(A) / <span class="keyword">sizeof</span>(<span class="type">int</span>);</span><br><span class="line">  <span class="type">int</span> T;</span><br><span class="line">  <span class="type">int</span> B[<span class="number">10</span>] = &#123; <span class="number">0</span> &#125;;</span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; N; i++) &#123;</span><br><span class="line">    T = A[i];</span><br><span class="line">    A[i] = B[i];</span><br><span class="line">    B[i] = T;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 阻止编译器优化掉上面的逻辑</span></span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; N; i++) &#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;%d %d\n&quot;</span>, A[i], B[i]);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</pre>
+<div>
+➡
+</div>
+<pre>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">func_vec</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="type">int</span> A[<span class="number">10</span>] = </span><br><span class="line">    &#123; <span class="number">1</span>, <span class="number">22</span>, <span class="number">333</span>, <span class="number">4444</span>, <span class="number">55555</span>, <span class="number">413</span>, <span class="number">2333</span>, <span class="number">122</span>, <span class="number">1999</span>, <span class="number">10</span> &#125;;</span><br><span class="line">  <span class="type">int</span> N = <span class="keyword">sizeof</span>(A) / <span class="keyword">sizeof</span>(<span class="type">int</span>);</span><br><span class="line">  <span class="type">int</span> T[N];</span><br><span class="line">  <span class="type">int</span> B[<span class="number">10</span>] = &#123; <span class="number">0</span> &#125;;</span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; N; i++) &#123;</span><br><span class="line">    T[i] = A[i];</span><br><span class="line">    A[i] = B[i];</span><br><span class="line">    B[i] = T[i];</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 阻止编译器优化掉上面的逻辑</span></span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; N; i++) &#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;%d %d\n&quot;</span>, A[i], B[i]);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</pre>
+</div>
+
+<p>这个书上的例子有一定的问题，采用 <em>GCC</em> 不同等优化编译得到汇编后发现，<code>func_vec()</code> 中的 <code>T[N]</code> 在循环中会被优化成寄存器取代：</p>
+<div style="display: flex;justify-content : center;align-items: center;">
+<pre>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">-O1</span></span><br><span class="line">.L2:</span><br><span class="line">        ldr     r1, [r3]</span><br><span class="line">        ldr     r0, [r2]</span><br><span class="line">        str     r0, [r3], #4</span><br><span class="line">        str     r1, [r2], #4</span><br><span class="line">        cmp     r3, r6</span><br><span class="line">        bne     .L2</span><br><span class="line">        movw    r7, #:lower16:.LC1</span><br><span class="line">        movt    r7, #:upper16:.LC1</span><br></pre></td></tr></table></figure>
+</pre>
+<div style="border-left: 2px dashed grey;margin: 10px;"></div>
+<pre>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">-O2</span></span><br><span class="line">.L7:</span><br><span class="line">        ldr     r7, [lr]</span><br><span class="line">.L3:</span><br><span class="line">        ldr     r3, [ip]</span><br><span class="line">        str     r7, [ip], #4</span><br><span class="line">        str     r3, [lr], #4</span><br><span class="line">        cmp     ip, r5</span><br><span class="line">        bne     .L7</span><br><span class="line">        movw    r7, #:lower16:.LC1</span><br><span class="line">        movt    r7, #:upper16:.LC1</span><br></pre></td></tr></table></figure>
+</pre>
+</div>
+
+<p>循环中的行为和不采用向量化的函数一致，所以其实并没有得到书上预期中的优化效果，不过 <em>GCC</em> 优化策略也是合理的，访问寄存器远比写到内存要快</p>
+<h4 id="2-标量重命名"><a href="#2-标量重命名" class="headerlink" title="2. 标量重命名"></a>2. 标量重命名</h4><p>这属于语句之间存在强依赖，比如：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">func</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="type">int</span> a = <span class="number">3</span>, b = <span class="number">0</span>, y, z, T;</span><br><span class="line">  T = <span class="number">2</span>;        <span class="comment">// S1</span></span><br><span class="line">  y = T + T;    <span class="comment">// S2</span></span><br><span class="line">  T = a - b;    <span class="comment">// S3</span></span><br><span class="line">  z = T * T;    <span class="comment">// S4</span></span><br><span class="line">  <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里可以看出，<em>S1</em> - <em>S4</em> 之间出现了强依赖，导致了需要按照 4 条语句间顺序进行执行，对于编译器优化与指令重排来说并不是十分友好。其实不难看出可以将总体语句划分出 <em>S1</em>&amp;<em>S2</em> 与 <em>S3</em>&amp;<em>S4</em> 两块，那么 <code>T</code> 的作用其实局限在了两块内，并不需要上下块进行依靠，因此改进如下：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">func</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="type">int</span> a = <span class="number">3</span>, b = <span class="number">0</span>, y, z, T, T1;</span><br><span class="line">  T = <span class="number">2</span>;          <span class="comment">// S1</span></span><br><span class="line">  y = T + T;      <span class="comment">// S2</span></span><br><span class="line">  T1 = a - b;     <span class="comment">// S3</span></span><br><span class="line">  z = T1 * T1;    <span class="comment">// S4</span></span><br><span class="line">  <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>编译器在一定可能的情况下会对其进行优化？</p>
+<h2 id="公共子表达式优化"><a href="#公共子表达式优化" class="headerlink" title="公共子表达式优化"></a>公共子表达式优化</h2><p>当程序中存在多个相同的表达式，使用临时变量进行归纳即可，避免重复计算</p>
+<h2 id="分支语句优化"><a href="#分支语句优化" class="headerlink" title="分支语句优化"></a>分支语句优化</h2><p>处理器运用流水线机制来提高性能，而流水线机制需要填充指令来进行依次的执行，那么遇到分支语句与条件跳转时，会导致后续的指令失效并重新填充流水线，这将导致性能的损失。所以这里有一些方法来进行优化</p>
+<h3 id="1-合并判断条件"><a href="#1-合并判断条件" class="headerlink" title="1. 合并判断条件"></a>1. 合并判断条件</h3><p>简化判断条件语句，有利于流水线性能的提升</p>
+<h3 id="2-生成选择指令"><a href="#2-生成选择指令" class="headerlink" title="2. 生成选择指令"></a>2. 生成选择指令</h3><p>三目运算符即选择指令</p>
+<blockquote>
+<p>只有一些平台支持选择指令</p>
+</blockquote>
+<h3 id="3-运用条件编译"><a href="#3-运用条件编译" class="headerlink" title="3. 运用条件编译"></a>3. 运用条件编译</h3><p>按照不同的条件来控制是否选择编译这段代码。实际上是针对不同的平台进行对应的实现，同样避免全量编译</p>
+<h3 id="4-移除分支语句"><a href="#4-移除分支语句" class="headerlink" title="4. 移除分支语句"></a>4. 移除分支语句</h3><p>运用<strong>查表法</strong>能够有利于分支跳转优化，如果分支的结果可以通过计算得出那么可以将结果转换成数组进行存储，这样有利于减少分支跳转</p>
+<h3 id="5-平衡分支跳转"><a href="#5-平衡分支跳转" class="headerlink" title="5. 平衡分支跳转"></a>5. 平衡分支跳转</h3><p><code>switch</code> 是很常用的一种语法方式，对于过多的分支可以采取平衡的策略来做更好的跳转，比如：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">switch</span> (CASE) &#123;</span><br><span class="line">  <span class="keyword">case</span> <span class="number">1</span>: func_1();</span><br><span class="line">  <span class="keyword">case</span> <span class="number">2</span>: func_2();</span><br><span class="line">  <span class="keyword">case</span> <span class="number">4</span>: func_4();</span><br><span class="line">  <span class="keyword">case</span> <span class="number">6</span>: func_6();</span><br><span class="line">  <span class="keyword">case</span> <span class="number">8</span>: func_9();</span><br><span class="line">  <span class="keyword">case</span> <span class="number">10</span>: func_10();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>流程如下：</p>
+<pre class="mermaid">flowchart LR
+    CASE_1(CASE == 1)
+    CASE_2(CASE == 2)
+    CASE_4(CASE == 4)
+    CASE_6(CASE == 6)
+    CASE_8(CASE == 8)
+    CASE_10(CASE == 10)
+
+    CASE_1 --> CASE_2 --> CASE_4
+    CASE_4 --> CASE_6 --> CASE_8 --> CASE_10</pre>
+<p>可以将分支进行平衡：</p>
+<pre class="mermaid">flowchart TD
+    CASE_0(CASE < 5)
+    CASE_1(CASE < 3)
+    CASE_2(CASE < 7)
+    CASE_3(CASE < 2)
+    CASE_4(CASE = 4)
+    CASE_5(CASE = 6)
+    CASE_6(CASE < 9)
+    CASE_7(CASE = 1)
+    CASE_8(CASE = 2)
+    CASE_9(CASE = 8)
+    CASE_10(CASE = 10)
+
+    CASE_0 --> CASE_1
+    CASE_0 --> CASE_2
+    CASE_1 --> CASE_3
+    CASE_1 --> CASE_4
+    CASE_3 --> CASE_7
+    CASE_3 --> CASE_8
+
+    CASE_2 --> CASE_5
+    CASE_2 --> CASE_6
+    CASE_6 --> CASE_9
+    CASE_6 --> CASE_10</pre>
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><p>不难看出过程优化其实算得上编程上的一些细节与习惯，平常编写的时候多留意反而会取得更好的效果</p>
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%89%8D%E8%A8%80"><span class="top-box-text">前言</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%96%B9%E6%B3%95"><span class="top-box-text">方法</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%88%AB%E5%90%8D%E6%B6%88%E9%99%A4%EF%BC%88Memory-Aliasing%EF%BC%89"><span class="top-box-text">别名消除（Memory Aliasing）</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%B8%B8%E6%95%B0%E4%BC%A0%E6%92%AD"><span class="top-box-text">常数传播</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E4%BC%A0%E5%8F%82%E4%BC%98%E5%8C%96"><span class="top-box-text">传参优化</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%86%85%E8%81%94%E6%9B%BF%E6%8D%A2"><span class="top-box-text">内联替换</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F"><span class="top-box-text">全局变量</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E8%AF%AD%E5%8F%A5%E7%BA%A7%E4%BC%98%E5%8C%96"><span class="top-box-text">语句级优化</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#1-%E5%88%A0%E9%99%A4%E5%86%97%E4%BD%99%E8%AF%AD%E5%8F%A5"><span class="top-box-text">1. 删除冗余语句</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#2-%E4%BB%A3%E6%95%B0%E5%8F%98%E6%8D%A2"><span class="top-box-text">2. 代数变换</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#3-%E5%8E%BB%E9%99%A4%E7%9B%B8%E5%85%B3%E6%80%A7"><span class="top-box-text">3. 去除相关性</span></a></li></ol></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%85%AC%E5%85%B1%E5%AD%90%E8%A1%A8%E8%BE%BE%E5%BC%8F%E4%BC%98%E5%8C%96"><span class="top-box-text">公共子表达式优化</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%88%86%E6%94%AF%E8%AF%AD%E5%8F%A5%E4%BC%98%E5%8C%96"><span class="top-box-text">分支语句优化</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#1-%E5%90%88%E5%B9%B6%E5%88%A4%E6%96%AD%E6%9D%A1%E4%BB%B6"><span class="top-box-text">1. 合并判断条件</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#2-%E7%94%9F%E6%88%90%E9%80%89%E6%8B%A9%E6%8C%87%E4%BB%A4"><span class="top-box-text">2. 生成选择指令</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#3-%E8%BF%90%E7%94%A8%E6%9D%A1%E4%BB%B6%E7%BC%96%E8%AF%91"><span class="top-box-text">3. 运用条件编译</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#4-%E7%A7%BB%E9%99%A4%E5%88%86%E6%94%AF%E8%AF%AD%E5%8F%A5"><span class="top-box-text">4. 移除分支语句</span></a></li><li class="top-box-item top-box-level-3"><a class="top-box-link" href="#5-%E5%B9%B3%E8%A1%A1%E5%88%86%E6%94%AF%E8%B7%B3%E8%BD%AC"><span class="top-box-text">5. 平衡分支跳转</span></a></li></ol></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%80%BB%E7%BB%93"><span class="top-box-text">总结</span></a></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2024/08/09/struct-cvt-json/">
+          <h3 class="post-title">
+            下一篇：C++中数据转换设计 —— 对接 Json 转换
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+    <div id="gitalk-container"></div>
+
+
+
+
+
+
+<script>
+    (function () {
+        const jq = document.createElement('script');
+        jq.src = "/js/twikoo.min.js";
+        document.getElementsByTagName('body')[0].appendChild(jq);
+
+        const config = {"envId":"https://zyxeeker-blog.hf.space","region":null,"mark":null};
+        jq.onload = function () {
+            twikoo.init({
+                envId: config.envId,
+                el: '#gitalk-container',
+                region: config.region,
+                path: location.pathname + (config.mark ? '?mark=' + config.mark : ''),
+                lang: config.language,
+            });
+        }
+    })()
+</script>
+
+
+
+
+<footer>
+    <div class="site-footer">
+        <div class="social-container">
+            
+            
+            <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
+                <i class="icon icon-github"></i>
+            </a>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+        </div>
+        
+        Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a
+            href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+        
+        
+        
+        
+        
+        
+    </div>
+    <!-- mermaid -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            // 检查用户的首选颜色模式
+            const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            mermaid.initialize({
+                theme: isDarkMode ? 'neutral' : 'base'
+            });
+        }
+    </script>
+    <!-- diagrams -->
+    <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+    <style type="text/css">
+        @media (prefers-color-scheme: dark) {
+            svg {
+                filter: invert(93%) hue-rotate(180deg);
+                background-color: transparent !important;
+            }
+
+            image {
+                filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+            }
+        }
+
+        .mxgraph-container {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</footer>
+
+
+</div>
+</div>
+
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+</body>
+
+</html>
+
