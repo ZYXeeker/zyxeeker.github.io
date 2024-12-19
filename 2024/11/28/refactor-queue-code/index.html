@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>重构与优化 —— 代码分析</title>
+<meta name="keywords" content="重构与优化 —— 代码分析, ZYXeeker`s blog">
+<meta name="description" content="
+硬件 &amp; 版本依据：ARM A53，ARMv7，ARM GCC 11.1.0
+
+前言最近学习性能优化时想起这么多项目当前使用的数据缓冲队列，虽然经历了多个产品版本迭代，但是并没得到重视因此并没有进行良好的改进（毕竟代码和人一个能跑">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="重构与优化 —— 代码分析">
+<meta property="og:description" content="
+硬件 &amp; 版本依据：ARM A53，ARMv7，ARM GCC 11.1.0
+
+前言最近学习性能优化时想起这么多项目当前使用的数据缓冲队列，虽然经历了多个产品版本迭代，但是并没得到重视因此并没有进行良好的改进（毕竟代码和人一个能跑">
+
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://blog.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://blog.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/memo" class="menu purple-link">
+        便笺
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">重构与优化 —— 代码分析</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2024-11-28</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/Refactor/">
+              Refactor
+                
+                  ，
+                
+              </a>
+            
+              <a href="/tags/Performance/">
+              Performance
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <blockquote>
+<p>硬件 &amp; 版本依据：ARM A53，ARMv7，ARM GCC 11.1.0</p>
+</blockquote>
+<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>最近学习性能优化时想起这么多项目当前使用的数据缓冲队列，虽然经历了多个产品版本迭代，但是并没得到重视因此并没有进行良好的改进（毕竟代码和人一个能跑就行）。因此这里做一次优化分析和改进，顺便掌握下性能工具的用法</p>
+<h1 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h1><h2 id="使用流程分析"><a href="#使用流程分析" class="headerlink" title="使用流程分析"></a>使用流程分析</h2><p>从业务场景出发分析，大致的流程如下：</p>
+<pre class="mermaid">flowchart TD
+    subgraph Kernel
+        Camera(相机)-->Encode(硬件编码)
+    end
+    subgraph CameraService
+        SetofFrameQueue(多分辨率 std::set&lt;FrameQueue*&gt; 数组)
+        subgraph 事件处理
+            CreateMem(创建 FrameBufferMemory*)
+            CreateMem --> ChooseResoultion(选择对应分辨率集合)
+            ChooseResoultion --> Push(将数据指针压入队列)
+            Push --> WaitForNext([等待下一次触发])
+        end
+        SetofFrameQueue <--> ChooseResoultion
+    end
+    Encode --> |通知| 事件处理
+    Worker(业务模块 <i>1..N</i>)
+    Worker --> |创建| FrameQueue(FrameQueue <i>1..N</i>)
+    FrameQueue --> |注册| SetofFrameQueue
+    Worker ----> PopTimedOut(超时等待数据指针弹出队列)
+    FrameQueue <----> PopTimedOut
+    PopTimedOut --> Process([业务处理])</pre>
+
+<p>从整体的流程看出，一个相机服务下面其实托管了多个分辨率的 <code>std::set&lt;FrameQueue*&gt;</code> 数组，由于历史原因，选择对应数组的下标与既定的分辨率数组和硬件相对应，大致代码如下：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> MAX_CHANNEL    8</span></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">RESOLUTION</span> &#123;</span><br><span class="line">  <span class="type">int32_t</span> w;</span><br><span class="line">  <span class="type">int32_t</span> h;</span><br><span class="line">  <span class="type">int32_t</span> maxFps;</span><br><span class="line">&#125;;</span><br><span class="line">  </span><br><span class="line"><span class="keyword">class</span> <span class="title class_">CameraService</span> &#123;</span><br><span class="line">  ...</span><br><span class="line">  <span class="keyword">private</span>:</span><br><span class="line">    RESOLUTION m_resolutions[MAX_CHANNEL];</span><br><span class="line">    std::set&lt;std::shared_ptr&lt;FrameQueue&gt; &gt; m_outputs[MAX_CHANNEL];</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>由于是嵌入式业务高并发需求相对较低，但是通过选用数组+集合的形式来管理是否有点过于小题大做？是否可以通过一个 <code>FrameQueue</code> 采用<em>订阅发布模式</em>进行处理呢？</p>
+<h2 id="代码分析"><a href="#代码分析" class="headerlink" title="代码分析"></a>代码分析</h2><p>最主要的实现为 <code>Buffer</code> 和 <code>Queue</code>，<em>UML</em> 如下：</p>
+<pre class="mermaid">classDiagram
+    direction RL
+    class FrameBuffer {
+        << Abstract >>
+        +uint32_t getFrameSize(PIXEL_FMT type, int32_t w, int32_t h)$
+        
+        +void setSeq(uint32_t seq)
+        +uint32_t getSeq()
+        
+        +void setTimeStamp(uint64_t timestamp)
+        +uint64_t getTimeStamp()
+
+        +void setPixelExtFmt(const PIXEL_EXT_FMT& fmt)*
+        +PIXEL_EXT_FMT getPixelExtFmt()*
+        +PIXEL_FMT getPixelFmt()*
+                
+        +int32_t getWidth()*
+        +int32_t getHeight()*
+        
+        +char* getVirAddr(int32_t idx, uint32_t& bufSize)*
+        +uint64_t getPhyAddr(int32_t idx)*
+
+        +void setDataLen(uint32_t len)*
+        +uint32_t getDataLen()*
+
+        +void setExtData(void* pBuf, uint32_t bufSize)*
+        +void* getExtData(uint32_t& bufSize)*
+        
+        +uint32_t writeData(const char* data, uint32_t dataLen, uint32_t offset)*
+        +uint32_t readData(char* buf, uint32_t bufSize, uint32_t offset)*
+
+        - m_seq : uint32_t
+        - m_timestamp : uint64_t
+    }
+    class FrameQueue {
+        +FrameQueue(uint32_t maxSize)
+        +void push(const std::shared_ptr~FrameBuffer~& buffer)
+        +std::shared_ptr~FrameBuffer~ pop(uint32_t wait)
+        +bool empty()
+        +bool full()
+        +void clear()
+        +uint32_t size()
+
+        -std::mutex m_mutex
+        -std::condition_variable m_cond
+        -std::list~std::shared_ptr~FrameBuffer~ ~ m_bufferList
+        -int32_t m_w
+        -int32_t m_h
+        -PIXEL_FMT m_fmt
+        -uint32_t m_maxSize
+    }
+
+    class PIXEL_FMT {
+        << Enumeration >>
+        PIXEL_FMT_UNKNOWN
+        PIXEL_FMT_BAYER_RGGB16
+        PIXEL_FMT_YUYV
+        PIXEL_FMT_NV12
+        PIXEL_FMT_H264
+        PIXEL_FMT_H265
+        PIXEL_FMT_MJPEG
+        PIXEL_FMT_RAW16
+        PIXEL_FMT_AAC
+        PIXEL_FMT_PCM
+    }
+
+    class PIXEL_EXT_FMT {
+        << Enumeration >>
+        PIXEL_FMT_EXT_UNKNOWN
+        PIXEL_FMT_EXT_I
+        PIXEL_FMT_EXT_P
+        PIXEL_FMT_EXT_B
+    }
+
+    FrameBuffer--PIXEL_FMT
+    FrameBuffer--PIXEL_EXT_FMT
+    FrameBufferMemory-->FrameBuffer
+    FrameQueue*--FrameBuffer</pre>
+
+<p>随着基线的切换很难找到最初始的版本，但设计的意图比较明显：从 <code>FrameBuffer</code> 出发对不同类型视频帧进行实现，然后使用 <code>FrameQueue</code> 形成缓冲管理，不过随着业务发展外加缺乏 <em>Code Review</em> 导致现在拥有了一个奇怪的 <code>class FrameBufferMemory</code> 继承然后又混入了音频帧类型，然后音频帧的 <em>Buffer</em> 也拥有视频帧的成员函数？既然是这样，那这个父类又有何意义？这里列出 <code>FrameBufferMemory</code> 成员变量以及对应的实现：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> &#123;</span><br><span class="line"> <span class="comment">// ...</span></span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  PIXEL_FMT m_type;</span><br><span class="line">  PIXEL_EXT_FMT m_extFmt;</span><br><span class="line">  <span class="type">char</span>* m_buffer;</span><br><span class="line">  <span class="type">uint32_t</span> m_dataLen;</span><br><span class="line">  <span class="type">uint32_t</span> m_bufferSize;</span><br><span class="line">  <span class="type">int32_t</span> m_width;</span><br><span class="line">  <span class="type">int32_t</span> m_height;</span><br><span class="line">  std::mutex m_mutex;</span><br><span class="line">  <span class="type">void</span>* m_pExtData;</span><br><span class="line">  <span class="type">uint32_t</span> m_ExtDataSizeInBytes;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>实现：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line">FrameBufferMemory::<span class="built_in">FrameBufferMemory</span>(PIXEL_FMT type, <span class="type">void</span>* buf, <span class="type">int32_t</span> w,</span><br><span class="line">                                     <span class="type">int32_t</span> h, <span class="type">uint32_t</span> bufSize)</span><br><span class="line">    : <span class="built_in">m_type</span>(type),</span><br><span class="line">      <span class="built_in">m_extFmt</span>(PIXEL_FMT_EXT_UNKNOWN),</span><br><span class="line">      <span class="built_in">m_buffer</span>((<span class="type">char</span>*)buf),</span><br><span class="line">      <span class="built_in">m_bufferSize</span>(bufSize),</span><br><span class="line">      <span class="built_in">m_width</span>(w),</span><br><span class="line">      <span class="built_in">m_height</span>(h) &#123;</span><br><span class="line">  m_pExtData = <span class="literal">NULL</span>;</span><br><span class="line">  m_ExtDataSizeInBytes = <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">FrameBufferMemory::~<span class="built_in">FrameBufferMemory</span>() &#123;</span><br><span class="line">  <span class="built_in">free</span>(m_buffer);</span><br><span class="line">  <span class="keyword">if</span> (m_pExtData != <span class="literal">NULL</span>) &#123;</span><br><span class="line">    <span class="built_in">free</span>(m_pExtData);</span><br><span class="line">    m_pExtData = <span class="literal">NULL</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  m_ExtDataSizeInBytes = <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">FrameBufferMemory::setPixelExtFmt</span><span class="params">(<span class="type">const</span> PIXEL_EXT_FMT&amp; fmt)</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  m_extFmt = fmt;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">PIXEL_FMT <span class="title">FrameBufferMemory::getPixelFmt</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">return</span> m_type;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">PIXEL_EXT_FMT <span class="title">FrameBufferMemory::getPixelExtFmt</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">return</span> m_extFmt;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int32_t</span> <span class="title">FrameBufferMemory::getWidth</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">return</span> m_width;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int32_t</span> <span class="title">FrameBufferMemory::getHeight</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">return</span> m_height;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">char</span>* <span class="title">FrameBufferMemory::getVirAddr</span><span class="params">(<span class="type">int32_t</span> idx, <span class="type">uint32_t</span>&amp; bufSize)</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  bufSize = m_bufferSize;</span><br><span class="line">  <span class="keyword">return</span> (<span class="type">char</span>*)m_buffer;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">uint32_t</span> <span class="title">FrameBufferMemory::getDataLen</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">return</span> m_dataLen;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">FrameBufferMemory::setDataLen</span><span class="params">(<span class="type">uint32_t</span> len)</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  m_dataLen = len;</span><br><span class="line">  <span class="keyword">if</span> (m_dataLen &gt; m_bufferSize) &#123;</span><br><span class="line">    m_dataLen = m_bufferSize;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">FrameBufferMemory::setExtData</span><span class="params">(<span class="type">void</span>* pBuf, <span class="type">uint32_t</span> bufSize)</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">if</span> (m_pExtData != <span class="literal">NULL</span>) &#123;</span><br><span class="line">    <span class="built_in">free</span>(m_pExtData);</span><br><span class="line">    m_pExtData = <span class="literal">NULL</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  m_pExtData = pBuf;</span><br><span class="line">  m_ExtDataSizeInBytes = bufSize;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span>* <span class="title">FrameBufferMemory::getExtData</span><span class="params">(<span class="type">uint32_t</span>&amp; bufSize)</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="type">void</span>* pBuf = m_pExtData;</span><br><span class="line">  bufSize = m_ExtDataSizeInBytes;</span><br><span class="line">  <span class="keyword">return</span> pBuf;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">uint32_t</span> <span class="title">FrameBufferMemory::writeData</span><span class="params">(<span class="type">const</span> <span class="type">char</span>* data, <span class="type">uint32_t</span> dataLen,</span></span></span><br><span class="line"><span class="params"><span class="function">                                           <span class="type">uint32_t</span> offset)</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">if</span> (offset + dataLen &gt; m_bufferSize) &#123;</span><br><span class="line">    dataLen = m_bufferSize - offset;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">memcpy</span>(m_buffer + offset, data, dataLen);</span><br><span class="line">  m_dataLen = dataLen + offset;</span><br><span class="line">  <span class="keyword">return</span> dataLen;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">uint32_t</span> <span class="title">FrameBufferMemory::readData</span><span class="params">(<span class="type">char</span>* buf, <span class="type">uint32_t</span> bufSize,</span></span></span><br><span class="line"><span class="params"><span class="function">                                          <span class="type">uint32_t</span> offset)</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">if</span> (offset &gt;= m_dataLen) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (bufSize &gt; m_dataLen - offset) &#123;</span><br><span class="line">    bufSize = m_dataLen - offset;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">memcpy</span>(buf, m_buffer + offset, bufSize);</span><br><span class="line">  <span class="keyword">return</span> bufSize;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>不难发现一些问题：</p>
+<ol>
+<li>不相关的帧类型也可以调用无关的成员函数</li>
+<li>锁的粒度太大：一些只有 <em>get</em> 操作的成员变量也有对锁的操作，倘若出现一个线程在写入内存数据而另一个线程只需要快速查询 <em>width</em> 和 <em>height</em> 的场景时，查询线程必须等待写入线程释放锁才能继续</li>
+<li>锁的数量过多：这需要和 <code>FrameQueue</code> 结合来分析，就以目前项目中最大容量 4 来看，总共 8 个不同的分辨率，就会有 32 把锁，如果容量和分辨率数量增多，那锁的数量超乎你的想象</li>
+<li>内存的申请和释放不在同一个对象里管理：这里只有析构里面调用 <code>free</code> ，但是所申请的内存是由外面传入，这有可能导致调用者出现二次释放的危险</li>
+<li>函数接口设计混乱：比如对 extdata 的设计，set 和 get 的设计十分混乱</li>
+<li>缺乏闭包设计：很多参数可以通过设计合适的结构体来传入&#x2F;获取，比如构造函数中的参数就过多了，如果后续继续增加那么就会出现参数压栈的情况</li>
+</ol>
+<p>总而言之，这是一个很差的实现，接下来看下 <code>FrameQueue</code>：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line">FrameQueue::<span class="built_in">FrameQueue</span>(<span class="type">uint32_t</span> maxSize) : <span class="built_in">m_maxSize</span>(maxSize) &#123;</span><br><span class="line">  m_w = <span class="number">0</span>;</span><br><span class="line">  m_h = <span class="number">0</span>;</span><br><span class="line">  m_fmt = PIXEL_FMT_UNKNOWN;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">FrameQueue::~<span class="built_in">FrameQueue</span>() &#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">FrameQueue::push</span><span class="params">(<span class="type">const</span> std::shared_ptr&lt;FrameBuffer&gt;&amp; buffer)</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">if</span> (m_w != <span class="number">0</span> &amp;&amp; buffer-&gt;<span class="built_in">getWidth</span>() != m_w) &#123;</span><br><span class="line">    <span class="keyword">return</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (m_h != <span class="number">0</span> &amp;&amp; buffer-&gt;<span class="built_in">getHeight</span>() != m_h) &#123;</span><br><span class="line">    <span class="keyword">return</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (m_fmt != PIXEL_FMT_UNKNOWN &amp;&amp; buffer-&gt;<span class="built_in">getPixelFmt</span>() != m_fmt) &#123;</span><br><span class="line">    <span class="keyword">return</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (m_bufferList.<span class="built_in">size</span>() == m_maxSize) &#123;</span><br><span class="line">    m_bufferList.<span class="built_in">pop_front</span>();</span><br><span class="line">  &#125;</span><br><span class="line">  m_bufferList.<span class="built_in">push_back</span>(buffer);</span><br><span class="line">  <span class="keyword">if</span> (m_bufferList.<span class="built_in">size</span>() == <span class="number">1</span>) &#123;</span><br><span class="line">    m_cond.<span class="built_in">notify_all</span>();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">std::shared_ptr&lt;FrameBuffer&gt; <span class="title">FrameQueue::pop</span><span class="params">(<span class="type">uint32_t</span> wait)</span> </span>&#123;</span><br><span class="line">  <span class="function">std::unique_lock&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">if</span> (wait == <span class="number">0</span> &amp;&amp; m_bufferList.<span class="built_in">empty</span>()) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">nullptr</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">while</span> (m_bufferList.<span class="built_in">empty</span>()) &#123;</span><br><span class="line">    <span class="keyword">if</span> (m_cond.<span class="built_in">wait_for</span>(lock, std::chrono::<span class="built_in">milliseconds</span>(wait)) ==</span><br><span class="line">        std::cv_status::timeout) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">nullptr</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (m_bufferList.<span class="built_in">empty</span>()) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">nullptr</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">auto</span> front = m_bufferList.<span class="built_in">front</span>();</span><br><span class="line">  m_bufferList.<span class="built_in">pop_front</span>();</span><br><span class="line">  <span class="keyword">return</span> front;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">FrameQueue::clear</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  m_bufferList.<span class="built_in">clear</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">uint32_t</span> <span class="title">FrameQueue::size</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">return</span> m_bufferList.<span class="built_in">size</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">FrameQueue::empty</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">return</span> m_bufferList.<span class="built_in">empty</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">FrameQueue::full</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(m_mutex)</span></span>;</span><br><span class="line">  <span class="keyword">return</span> m_bufferList.<span class="built_in">size</span>() == m_maxSize;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>总结下设计问题：</p>
+<ol>
+<li>缺乏事件驱动设计：只存在超时 <code>pop</code> 的设计，毕竟 <em>cv</em> 的 <code>wait_for</code> 中设计存在循环</li>
+<li>存在隐性的内存泄漏风险：根据 <code>pop</code> 的设计可以看出，当数据从 <code>m_bufferList</code> 中拿出后，这块内存就不再由 <code>FrameQueue</code> 管理，数据的释放取决于最后一个模块，也就是引用计数归 0 时，但如果出现某个模块占有时间过长，那么就会出现泄露的风险</li>
+<li>释放的性能问题：根据现在的设计，既然依靠智能指针对 <code>FrameBuffer</code> 进行管理，那么最终释放内存归还给系统的路径在最后一个模块使用完毕的地方</li>
+<li>未能复用内存：复用内存能得到更好的性能，比如采用常见的环形队列，这样可以减少容器使用的开销<br>从代码上分析不难看出 <em>Buffer</em> 和 <em>Queue</em> 两者的设计确实差劲</li>
+</ol>
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%89%8D%E8%A8%80"><span class="top-box-text">前言</span></a></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%88%86%E6%9E%90"><span class="top-box-text">分析</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E4%BD%BF%E7%94%A8%E6%B5%81%E7%A8%8B%E5%88%86%E6%9E%90"><span class="top-box-text">使用流程分析</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E4%BB%A3%E7%A0%81%E5%88%86%E6%9E%90"><span class="top-box-text">代码分析</span></a></li></ol></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2024/11/22/HPC-loop/">
+          <h3 class="post-title">
+            下一篇：程序性能优化 —— 循环优化
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+    <div id="gitalk-container"></div>
+
+
+
+
+
+
+<script>
+    (function () {
+        const jq = document.createElement('script');
+        jq.src = "/js/twikoo.min.js";
+        document.getElementsByTagName('body')[0].appendChild(jq);
+
+        const config = {"envId":"https://zyxeeker-blog.hf.space","region":null,"mark":null};
+        jq.onload = function () {
+            twikoo.init({
+                envId: config.envId,
+                el: '#gitalk-container',
+                region: config.region,
+                path: location.pathname + (config.mark ? '?mark=' + config.mark : ''),
+                lang: config.language,
+            });
+        }
+    })()
+</script>
+
+
+
+
+<footer>
+    <div class="site-footer">
+        <div class="social-container">
+            
+            
+            <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
+                <i class="icon icon-github"></i>
+            </a>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+        </div>
+        
+        Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a
+            href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+        
+        
+        
+        
+        
+        
+    </div>
+    <!-- mermaid -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            // 检查用户的首选颜色模式
+            const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            mermaid.initialize({
+                theme: isDarkMode ? 'neutral' : 'base'
+            });
+        }
+    </script>
+    <!-- diagrams -->
+    <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+    <style type="text/css">
+        .MathJax svg {
+          filter: none;
+        }
+        @media (prefers-color-scheme: dark) {
+            svg {
+                filter: invert(93%) hue-rotate(180deg);
+                background-color: transparent !important;
+            }
+
+            image {
+                filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+            }
+        }
+
+        .mxgraph-container {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</footer>
+
+
+</div>
+</div>
+
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+</body>
+
+</html>
+
