@@ -85,6 +85,48 @@
 
 <section class="post-item">
     <div class="content">
+      <a href="/2025/01/03/atomic-rwlock-spin/">
+        <h2 class="post-title">原子读写锁 —— 流程与自旋</h2>
+      </a>
+      <a href="/2025/01/03/atomic-rwlock-spin/">
+          <div class="post-abstract">
+            
+			    前言在 C++ 17 之前的标准中并不存在读写锁的对应封装，因此对于不同平台下需要分别进行实现，当然也可以采取 N2406 - Mutex, Lock, Condition Variable Rationale 的提案中的 shared_m
+            
+          </div>
+      </a>
+      <div class="post-info">
+        <span><i class="icon icon-calendar-outline"></i> 2025-01-03</span>
+        
+          <span>
+            <i class="icon icon-pricetags-outline"></i>
+            
+
+                C++
+                
+                  ，
+                
+            
+
+                Async
+                
+                  ，
+                
+            
+
+                HPC
+                
+            
+          </span>
+        
+      </div>
+    </div>
+  </section>
+
+
+
+<section class="post-item">
+    <div class="content">
       <a href="/2024/12/05/refactor-queue-trace/">
         <h2 class="post-title">重构与优化 —— 追踪分析</h2>
       </a>
@@ -416,46 +458,6 @@ live555 作为一款 RTSP 开源库被广泛的应用在各种项目中间，但
 
 
 
-<section class="post-item">
-    <div class="content">
-      <a href="/2024/06/28/asm-func-stack/">
-        <h2 class="post-title">汇编-函数与栈</h2>
-      </a>
-      <a href="/2024/06/28/asm-func-stack/">
-          <div class="post-abstract">
-            
-			    
-环境依据：Ubuntu2204 x64gcc version 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04)
-
-记录 C 中栈对函数的管理
-DEMO示例代码int test1(int a, int b) &#1
-            
-          </div>
-      </a>
-      <div class="post-info">
-        <span><i class="icon icon-calendar-outline"></i> 2024-06-28</span>
-        
-          <span>
-            <i class="icon icon-pricetags-outline"></i>
-            
-
-                内存管理
-                
-                  ，
-                
-            
-
-                汇编
-                
-            
-          </span>
-        
-      </div>
-    </div>
-  </section>
-
-
-
 
     <div class="pagination-container">
       
@@ -498,7 +500,7 @@ DEMO示例代码int test1(int a, int b) &#1
         
     </div>
     <!-- mermaid -->
-    <script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+    <script src="https://unpkg.com/mermaid@10.9.0/dist/mermaid.min.js"></script>
     <script>
         if (window.mermaid) {
             // 检查用户的首选颜色模式
