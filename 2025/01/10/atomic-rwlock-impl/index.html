@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>原子读写锁 —— 实现</title>
+<meta name="keywords" content="原子读写锁 —— 实现, ZYXeeker`s blog">
+<meta name="description" content="
+前置理论：原子操作
+
+设计从前文出发，读写锁所需要只需要一个 uint32_t 类型的成员变量来记录写者的状态与读者数量，但由于是原子版本，所以记录状态的成员变量将会用 std::atomic_uint32_t 进行实现，同时运用编译期得">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="原子读写锁 —— 实现">
+<meta property="og:description" content="
+前置理论：原子操作
+
+设计从前文出发，读写锁所需要只需要一个 uint32_t 类型的成员变量来记录写者的状态与读者数量，但由于是原子版本，所以记录状态的成员变量将会用 std::atomic_uint32_t 进行实现，同时运用编译期得">
+
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://blog.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://blog.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/memo" class="menu purple-link">
+        便笺
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">原子读写锁 —— 实现</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2025-01-10</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/C/">
+              C++
+                
+                  ，
+                
+              </a>
+            
+              <a href="/tags/Async/">
+              Async
+                
+                  ，
+                
+              </a>
+            
+              <a href="/tags/HPC/">
+              HPC
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <blockquote>
+<p>前置理论：原子操作</p>
+</blockquote>
+<h1 id="设计"><a href="#设计" class="headerlink" title="设计"></a>设计</h1><p>从前文出发，读写锁所需要只需要一个 <code>uint32_t</code> 类型的成员变量来记录写者的状态与读者数量，但由于是原子版本，所以记录状态的成员变量将会用 <code>std::atomic_uint32_t</code> 进行实现，同时运用编译期得到写者占用的标志静态数据便于后续的运算：</p>
+<pre class="mermaid">classDiagram
+    class AtomicSharedMutex {
+        -std::atomic_uint32_t state_
+        -uint32_t writer_enterd_*
+    }</pre>
+<h2 id="接口"><a href="#接口" class="headerlink" title="接口"></a>接口</h2><p>接口命名从标准库的 <code>shared_mutex</code> 中借鉴：</p>
+<pre class="mermaid">classDiagram
+    class AtomicSharedMutex {
+        +LockShared()
+        +TryLockShared() bool
+        +UnlockShared()
+        +Lock()
+        +TryLock() bool
+        +Unlock()
+        -std::atomic_uint32_t state_
+        -uint32_t writer_enterd_*
+    }</pre>
+<p>接口对应的作用：</p>
+<ul>
+<li><code>LockShared()</code>：读者加锁，如果出现写者占用会进行阻塞等待</li>
+<li><code>TryLockShared()</code>：尝试进行读者加锁，返回加锁是否成功</li>
+<li><code>UnlockShared()</code>：读者解锁</li>
+<li><code>Lock()</code>：写者加锁，如果出现其他写者占用以及读者占用时将会阻塞等待</li>
+<li><code>TryLock()</code>：尝试进行写者加锁，返回加锁是否成功</li>
+<li><code>Unlock()</code>：写者解锁</li>
+</ul>
+<p>毕竟使用的是 C++ ，那么实现对应的锁管理器也是所需要的，取名同样源自标准库：</p>
+<pre class="mermaid">classDiagram
+    class AtomicSharedMutex {
+        +LockShared()
+        +TryLockShared() bool
+        +UnlockShared()
+        +Lock()
+        +TryLock() bool
+        +Unlock()
+        -std::atomic_uint32_t state_
+        -uint32_t writer_enterd_*
+    }
+
+    class SharedLock {
+        +SharedLock(AtomicSharedMutex&)
+        +~SharedLock()
+        -AtomicSharedMutex* lock_ 
+    }
+
+    class UniqueLock {
+        +UniqueLock(AtomicSharedMutex&)
+        -~UniqueLock()
+        -AtomicSharedMutex* lock_ 
+    }
+
+    AtomicSharedMutex --o SharedLock
+    AtomicSharedMutex --o UniqueLock</pre>
+<p><code>class SharedLock</code> 用于读者加锁，<code>class UniqueLock</code> 用于写者加锁</p>
+<h1 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h1><p>根据上面的设计思路，<code>AtomicSharedMutex</code> 实现基础定义如下：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 自旋最大尝试值</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> ATOMIC_SHARED_MUTEX_TRY_COUNT_MAX 5</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">AtomicSharedMutex</span> &#123;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 写者占用标志</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="type">static</span> <span class="keyword">constexpr</span> <span class="type">uint32_t</span> writer_enterd_ = <span class="number">1U</span> &lt;&lt; (<span class="built_in">sizeof</span>(<span class="type">uint32_t</span>) * __CHAR_BIT__ - <span class="number">1</span>);</span><br><span class="line"> <span class="keyword">public</span>:</span><br><span class="line">  <span class="built_in">AtomicSharedMutex</span>() = <span class="keyword">default</span>;</span><br><span class="line">  <span class="built_in">AtomicSharedMutex</span>(<span class="type">const</span> AtomicSharedMutex&amp;) = <span class="keyword">delete</span>;</span><br><span class="line">  ~<span class="built_in">AtomicSharedMutex</span>() = <span class="keyword">default</span>;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 读者加锁</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">LockShared</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 尝试进行读者加锁, 如果出现写者占用会阻塞执行</span></span><br><span class="line"><span class="comment">   * @return 返回是否成功加锁</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">bool</span> <span class="title">TryLockShared</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 读者解锁</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">UnlockShared</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 写者加锁</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">Lock</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 尝试进行写者加锁, 如果出现其他写者占用以及读者占用时将会阻塞执行</span></span><br><span class="line"><span class="comment">   * @return 返回是否成功加锁</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">bool</span> <span class="title">TryLock</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 写者解锁</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">Unlock</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line">  AtomicSharedMutex&amp; <span class="keyword">operator</span>=(<span class="type">const</span> AtomicSharedMutex&amp;) = <span class="keyword">delete</span>;</span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 保存写者状态与读者数量</span></span><br><span class="line"><span class="comment">   * |          unsinged int            |</span></span><br><span class="line"><span class="comment">   * | occupied flag |   reader count   |</span></span><br><span class="line"><span class="comment">   * |       1       |  000..(31)..000  |</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  std::<span class="type">atomic_uint32_t</span> state_&#123;<span class="number">0</span>&#125;;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 用于读者加锁</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">SharedLock</span> &#123;</span><br><span class="line"> <span class="keyword">public</span>:</span><br><span class="line">  <span class="built_in">SharedLock</span>(AtomicSharedMutex&amp; lock);</span><br><span class="line">  ~<span class="built_in">SharedLock</span>();</span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  AtomicSharedMutex* lock_;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 用于写者加锁</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">UniqueLock</span> &#123;</span><br><span class="line"> <span class="keyword">public</span>:</span><br><span class="line">  <span class="built_in">UniqueLock</span>(AtomicSharedMutex&amp; lock);</span><br><span class="line">  ~<span class="built_in">UniqueLock</span>();</span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  AtomicSharedMutex* lock_;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>这里将最大尝试次数（<code>ATOMIC_SHARED_MUTEX_TRY_COUNT_MAX</code>）暂定为 5 次，需要根据平台进行合适的调整</p>
+<h2 id="实现-SpinLoopSleep"><a href="#实现-SpinLoopSleep" class="headerlink" title="实现 SpinLoopSleep"></a>实现 <code>SpinLoopSleep</code></h2><p>从前文的 <code>SpinLoopSleep</code> 逻辑对不同平台进行对应的实现：</p>
+<pre class="mermaid">---
+title: SpinLoopSleep
+---
+stateDiagram-v2
+    direction LR
+    ThreadSleep : Sleep
+    ThreadDoze : Doze
+    state IsMaxTryCount <<choice>>
+    [*] --> IsMaxTryCount
+    IsMaxTryCount --> ThreadSleep : 到达最大尝试次数
+    IsMaxTryCount --> ThreadDoze : 未到达尝试最大次数
+    ThreadDoze --> [*]
+    ThreadSleep --> [*]</pre>
+
+<p>这里将 <code>SpinLoopSleep</code> 作为静态私有函数实现，将 <em>Doze</em> 功能分开作为一个独立的函数，便于后续适配不同的平台以及可以用于其他自旋场景中，因此 <code>AtomicSharedMutex</code> 需要做出一定的修改：</p>
+<pre class="mermaid">classDiagram
+    class AtomicSharedMutex {
+        +LockShared()
+        +TryLockShared() bool
+        +UnlockShared()
+        +Lock()
+        +TryLock() bool
+        +Unlock()
+        -SpinLoopSleep(int32_t& try_count)*
+        -std::atomic_uint32_t state_
+        -uint32_t writer_enterd_*
+    }</pre>
+
+<p>对应实现的代码如下：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 自旋最大尝试值</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> ATOMIC_SHARED_MUTEX_TRY_COUNT_MAX 5</span></span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 用于自旋优化</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">inline</span> <span class="type">static</span> <span class="type">void</span> <span class="title">SpinLoop</span><span class="params">()</span> </span>&#123;</span><br><span class="line"><span class="meta">#<span class="keyword">if</span> defined(__x86_64__)</span></span><br><span class="line">  <span class="function">__asm__ <span class="title">volatile</span><span class="params">(<span class="string">&quot;pause&quot;</span>:::<span class="string">&quot;memory&quot;</span>)</span></span>;</span><br><span class="line"><span class="meta">#<span class="keyword">elif</span> defined(__arm__) || defined(__aarch64__)</span></span><br><span class="line">  <span class="function">__asm__ <span class="title">volatile</span><span class="params">(<span class="string">&quot;isb&quot;</span>:::<span class="string">&quot;memory&quot;</span>)</span></span>;</span><br><span class="line"><span class="meta">#<span class="keyword">else</span></span></span><br><span class="line">  <span class="function">__asm__ <span class="title">volatile</span><span class="params">(<span class="string">&quot;nop&quot;</span>:::<span class="string">&quot;memory&quot;</span>)</span></span>;</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span>  </span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">...</span><br><span class="line"></span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 用于到达一定次数后自旋优化的实现</span></span><br><span class="line"><span class="comment">   * @param try_count 尝试次数</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="keyword">inline</span> <span class="type">static</span> <span class="type">void</span> <span class="title">SpinLoopSleep</span><span class="params">(<span class="type">int32_t</span>&amp; try_count)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (try_count &gt;= ATOMIC_SHARED_MUTEX_TRY_COUNT_MAX) &#123;</span><br><span class="line">      <span class="type">static</span> <span class="keyword">struct</span> <span class="title class_">timespec</span> ts &#123; <span class="number">0</span>, <span class="number">1000</span> &#125;;</span><br><span class="line">      <span class="built_in">nanosleep</span>(&amp;ts, <span class="literal">nullptr</span>);</span><br><span class="line">      try_count = <span class="number">0</span>;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="built_in">SpinLoop</span>();</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">...</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h2 id="实现读者接口"><a href="#实现读者接口" class="headerlink" title="实现读者接口"></a>实现读者接口</h2><p>从读者加锁的流程出发实现对应的三个接口：</p>
+<pre class="mermaid">---
+title: 读者加锁
+---
+stateDiagram-v2
+    direction LR
+    ReaderIncreaed: 读者计数增加
+    state IsWriterOccupied <<choice>>
+    [*] --> IsWriterOccupied : 开始自旋
+    IsWriterOccupied --> SpinLoopSleep : 写者占用
+    SpinLoopSleep --> IsWriterOccupied
+    IsWriterOccupied --> ReaderIncreaed: 写者未占用
+    ReaderIncreaed --> [*] : 结束自旋 成功加锁</pre>
+
+<p>代码实现：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line">  <span class="function"><span class="type">void</span> <span class="title">LockShared</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="type">uint32_t</span> expected, desired;</span><br><span class="line">    <span class="type">int32_t</span> try_count&#123;&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (;;) &#123;</span><br><span class="line">      expected = state_.<span class="built_in">load</span>(std::memory_order_acquire) &amp; ~writer_enterd_;</span><br><span class="line">      desired = expected + <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">if</span> (</span><br><span class="line"><span class="meta">#<span class="keyword">if</span> defined(__x86_64__)</span></span><br><span class="line">        state_.<span class="built_in">compare_exchange_strong</span>(expected, desired, std::memory_order_release)</span><br><span class="line"><span class="meta">#<span class="keyword">else</span></span></span><br><span class="line">        state_.<span class="built_in">compare_exchange_weak</span>(expected, desired, std::memory_order_release)</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">        ) &#123;</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="built_in">SpinLoopSleep</span>(try_count);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 尝试进行读者加锁, 如果出现写者占用会阻塞执行</span></span><br><span class="line"><span class="comment">   * @return 返回是否成功加锁</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">bool</span> <span class="title">TryLockShared</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="type">uint32_t</span> expected, desired;</span><br><span class="line"></span><br><span class="line">    expected = state_.<span class="built_in">load</span>(std::memory_order_acquire) &amp; ~writer_enterd_;</span><br><span class="line">    desired = expected + <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">if</span> defined(__x86_64__) || defined(_M_X64)</span></span><br><span class="line">    <span class="keyword">return</span> state_.<span class="built_in">compare_exchange_strong</span>(expected, desired, std::memory_order_release);</span><br><span class="line"><span class="meta">#<span class="keyword">else</span></span></span><br><span class="line">    <span class="keyword">return</span> state_.<span class="built_in">compare_exchange_weak</span>(expected, desired, std::memory_order_release);</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 读者解锁</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">UnlockShared</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    state_.<span class="built_in">fetch_sub</span>(<span class="number">1</span>);</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="实现写者接口"><a href="#实现写者接口" class="headerlink" title="实现写者接口"></a>实现写者接口</h2><p>同样写者也根据之前的流程进行对应实现写者的加解锁：</p>
+<pre class="mermaid">---
+title: 写者加锁
+---
+stateDiagram-v2
+    direction LR
+    IsWriterOccupied : 写者占用判断
+    state IsWriterOccupied {
+        direction LR
+        SetWriterOccupied: 设置写者占用
+        state IsOtherWriterOccupied <<choice>>
+
+        [*] --> IsOtherWriterOccupied
+        IsOtherWriterOccupied --> SetWriterOccupied : 不存在其他写者占用
+        IsOtherWriterOccupied --> SpinLoop : 存在其他写者占用
+        SpinLoop --> IsOtherWriterOccupied
+        SetWriterOccupied --> [*]
+        
+        SpinLoop : SpinLoopSleep
+    }
+    IsReaderOccupied : 读者占用判断
+    state IsReaderOccupied {
+        direction LR
+        state IsReadersEmpty <<choice>>
+
+        [*] --> IsReadersEmpty
+        IsReadersEmpty --> SpinLoop_1 : 读者数量不为0
+        SpinLoop_1 --> IsReadersEmpty
+        IsReadersEmpty --> [*] : 读者数量为0
+        SpinLoop_1 : SpinLoopSleep
+    }
+
+    [*] --> IsWriterOccupied : 开始自旋
+    IsWriterOccupied --> IsReaderOccupied
+    IsReaderOccupied --> [*] : 结束自旋 成功加锁</pre>
+
+<p>代码实现：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 写者加锁</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">Lock</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="type">uint32_t</span> expected, desired;</span><br><span class="line">    <span class="type">int32_t</span> try_count&#123;&#125;;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span>(;;) &#123;</span><br><span class="line">      expected = state_.<span class="built_in">load</span>(std::memory_order_acquire) &amp; writer_enterd_;</span><br><span class="line">      desired = expected | writer_enterd_;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">if</span> (</span><br><span class="line"><span class="meta">#<span class="keyword">if</span> defined(__x86_64__)</span></span><br><span class="line">        state_.<span class="built_in">compare_exchange_strong</span>(expected, desired, std::memory_order_release)</span><br><span class="line"><span class="meta">#<span class="keyword">else</span></span></span><br><span class="line">        state_.<span class="built_in">compare_exchange_weak</span>(expected, desired, std::memory_order_release)</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">        ) &#123;</span><br><span class="line">        try_count = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">for</span> (;;) &#123;</span><br><span class="line">          expected = state_.<span class="built_in">load</span>(std::memory_order_acquire) &amp; writer_enterd_;</span><br><span class="line">          <span class="keyword">if</span> (</span><br><span class="line"><span class="meta">#<span class="keyword">if</span> defined(__x86_64__)</span></span><br><span class="line">            state_.<span class="built_in">compare_exchange_strong</span>(expected, expected, std::memory_order_release)</span><br><span class="line"><span class="meta">#<span class="keyword">else</span></span></span><br><span class="line">            state_.<span class="built_in">compare_exchange_weak</span>(expected, expected, std::memory_order_release)</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">            ) &#123;</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">          &#125;</span><br><span class="line">          <span class="built_in">SpinLoopSleep</span>(try_count);</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="built_in">SpinLoopSleep</span>(try_count);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 尝试进行写者加锁, 如果出现其他写者占用以及读者占用时将会阻塞执行</span></span><br><span class="line"><span class="comment">   * @return 返回是否成功加锁</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">bool</span> <span class="title">TryLock</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="type">uint32_t</span> expected, desired;</span><br><span class="line">  </span><br><span class="line">    expected = state_.<span class="built_in">load</span>(std::memory_order_acquire) &amp; writer_enterd_;</span><br><span class="line">    desired = expected | writer_enterd_;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (</span><br><span class="line"><span class="meta">#<span class="keyword">if</span> defined(__x86_64__)</span></span><br><span class="line">      state_.<span class="built_in">compare_exchange_strong</span>(expected, desired, std::memory_order_release)</span><br><span class="line"><span class="meta">#<span class="keyword">else</span></span></span><br><span class="line">      state_.<span class="built_in">compare_exchange_weak</span>(expected, desired, std::memory_order_release)</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">      ) &#123;</span><br><span class="line">      expected = state_.<span class="built_in">load</span>(std::memory_order_acquire) &amp; writer_enterd_;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">if</span> (</span><br><span class="line"><span class="meta">#<span class="keyword">if</span> defined(__x86_64__)</span></span><br><span class="line">        state_.<span class="built_in">compare_exchange_strong</span>(expected, expected, std::memory_order_release)</span><br><span class="line"><span class="meta">#<span class="keyword">else</span></span></span><br><span class="line">        state_.<span class="built_in">compare_exchange_weak</span>(expected, expected, std::memory_order_release)</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">        ) &#123;</span><br><span class="line">          <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 写者解锁</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">Unlock</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    state_.<span class="built_in">fetch_and</span>(~writer_enterd_);</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="实现锁管理器"><a href="#实现锁管理器" class="headerlink" title="实现锁管理器"></a>实现锁管理器</h2><p>锁管理器这里只是做简单的封装简单实现，所以实现并不复杂：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 用于读者加锁</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">SharedLock</span> &#123;</span><br><span class="line"> <span class="keyword">public</span>:</span><br><span class="line">  <span class="built_in">SharedLock</span>(AtomicSharedMutex&amp; lock)</span><br><span class="line">    : <span class="built_in">lock_</span>(std::<span class="built_in">addressof</span>(lock)) &#123;</span><br><span class="line">      lock_-&gt;<span class="built_in">LockShared</span>();</span><br><span class="line">    &#125;</span><br><span class="line">  ~<span class="built_in">SharedLock</span>() &#123;</span><br><span class="line">    lock_-&gt;<span class="built_in">UnlockShared</span>();</span><br><span class="line">  &#125;</span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  AtomicSharedMutex* lock_;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 用于写者加锁</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">UniqueLock</span> &#123;</span><br><span class="line"> <span class="keyword">public</span>:</span><br><span class="line">  <span class="built_in">UniqueLock</span>(AtomicSharedMutex&amp; lock)</span><br><span class="line">    : <span class="built_in">lock_</span>(std::<span class="built_in">addressof</span>(lock)) &#123;</span><br><span class="line">      lock_-&gt;<span class="built_in">Lock</span>();</span><br><span class="line">    &#125;</span><br><span class="line">  ~<span class="built_in">UniqueLock</span>() &#123;</span><br><span class="line">    lock_-&gt;<span class="built_in">Unlock</span>();</span><br><span class="line">  &#125;</span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  AtomicSharedMutex* lock_;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h1 id="源码"><a href="#源码" class="headerlink" title="源码"></a>源码</h1><p>至此所有逻辑实现完成，源码路径：<br><em>（TODO）</em></p>
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E8%AE%BE%E8%AE%A1"><span class="top-box-text">设计</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%8E%A5%E5%8F%A3"><span class="top-box-text">接口</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%AE%9E%E7%8E%B0"><span class="top-box-text">实现</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%AE%9E%E7%8E%B0-SpinLoopSleep"><span class="top-box-text">实现 SpinLoopSleep</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%AE%9E%E7%8E%B0%E8%AF%BB%E8%80%85%E6%8E%A5%E5%8F%A3"><span class="top-box-text">实现读者接口</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%AE%9E%E7%8E%B0%E5%86%99%E8%80%85%E6%8E%A5%E5%8F%A3"><span class="top-box-text">实现写者接口</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%AE%9E%E7%8E%B0%E9%94%81%E7%AE%A1%E7%90%86%E5%99%A8"><span class="top-box-text">实现锁管理器</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%BA%90%E7%A0%81"><span class="top-box-text">源码</span></a></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2025/01/03/atomic-rwlock-spin/">
+          <h3 class="post-title">
+            下一篇：原子读写锁 —— 流程与自旋
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+    <div id="gitalk-container"></div>
+
+
+
+
+
+
+<script>
+    (function () {
+        const jq = document.createElement('script');
+        jq.src = "/js/twikoo.min.js";
+        document.getElementsByTagName('body')[0].appendChild(jq);
+
+        const config = {"envId":"https://zyxeeker-blog.hf.space","region":null,"mark":null};
+        jq.onload = function () {
+            twikoo.init({
+                envId: config.envId,
+                el: '#gitalk-container',
+                region: config.region,
+                path: location.pathname + (config.mark ? '?mark=' + config.mark : ''),
+                lang: config.language,
+            });
+        }
+    })()
+</script>
+
+
+
+
+<footer>
+    <div class="site-footer">
+        <div class="social-container">
+            
+            
+            <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
+                <i class="icon icon-github"></i>
+            </a>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+        </div>
+        
+        Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a
+            href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+        
+        
+        
+        
+        
+        
+    </div>
+    <!-- mermaid -->
+    <script src="https://unpkg.com/mermaid@10.9.0/dist/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            // 检查用户的首选颜色模式
+            const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            mermaid.initialize({
+                theme: isDarkMode ? 'neutral' : 'base'
+            });
+        }
+    </script>
+    <!-- diagrams -->
+    <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+    <style type="text/css">
+        .MathJax svg {
+          filter: none;
+        }
+        @media (prefers-color-scheme: dark) {
+            svg {
+                filter: invert(93%) hue-rotate(180deg);
+                background-color: transparent !important;
+            }
+
+            image {
+                filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+            }
+        }
+
+        .mxgraph-container {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</footer>
+
+
+</div>
+</div>
+
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+</body>
+
+</html>
+

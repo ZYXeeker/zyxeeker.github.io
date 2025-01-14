@@ -91,6 +91,51 @@
 
 <section class="post-item">
     <div class="content">
+      <a href="/2025/01/10/atomic-rwlock-impl/">
+        <h2 class="post-title">原子读写锁 —— 实现</h2>
+      </a>
+      <a href="/2025/01/10/atomic-rwlock-impl/">
+          <div class="post-abstract">
+            
+			    
+前置理论：原子操作
+
+设计从前文出发，读写锁所需要只需要一个 uint32_t 类型的成员变量来记录写者的状态与读者数量，但由于是原子版本，所以记录状态的成员变量将会用 std::atomic_uint32_t 进行实现，同时运用编译期得
+            
+          </div>
+      </a>
+      <div class="post-info">
+        <span><i class="icon icon-calendar-outline"></i> 2025-01-10</span>
+        
+          <span>
+            <i class="icon icon-pricetags-outline"></i>
+            
+
+                C++
+                
+                  ，
+                
+            
+
+                Async
+                
+                  ，
+                
+            
+
+                HPC
+                
+            
+          </span>
+        
+      </div>
+    </div>
+  </section>
+
+
+
+<section class="post-item">
+    <div class="content">
       <a href="/2025/01/03/atomic-rwlock-spin/">
         <h2 class="post-title">原子读写锁 —— 流程与自旋</h2>
       </a>
