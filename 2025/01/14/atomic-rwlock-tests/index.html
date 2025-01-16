@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    
+
+    
+<script>!function(){var e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,t=localStorage.getItem("use-color-scheme")||"auto";("dark"===t||e&&"light"!==t)&&document.documentElement.classList.toggle("dark",!0)}()</script>
+    
+
+<meta charset="utf-8" >
+
+<title>原子读写锁 —— 测试</title>
+<meta name="keywords" content="原子读写锁 —— 测试, ZYXeeker`s blog">
+<meta name="description" content="
+上一篇加上测试会很长的篇幅，单独另写一篇
+
+
+原子读写锁的主要逻辑和相关的锁管理器均已实现完成，这里编写一个测试用例和标准库中的 shared_mutex 进行对比
+实现统一封装为了便于测试，这里对 AtomicSharedMutex 和">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="原子读写锁 —— 测试">
+<meta property="og:description" content="
+上一篇加上测试会很长的篇幅，单独另写一篇
+
+
+原子读写锁的主要逻辑和相关的锁管理器均已实现完成，这里编写一个测试用例和标准库中的 shared_mutex 进行对比
+实现统一封装为了便于测试，这里对 AtomicSharedMutex 和">
+
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style/main.css">
+
+  <meta name="generator" content="Hexo 7.1.1"></head>
+  <body>
+    <div id="app" class="main">
+
+<div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://blog.zyxeeker.top">
+        <img class="avatar" src="/images/avatar.png" alt="logo" width="32px" height="32px">
+      </a>
+      <a href="https://blog.zyxeeker.top">
+        <h1 class="site-title">ZYXeeker`s blog</h1>
+      </a>
+    </div>
+    <div class="right">
+        <i class="icon menu-switch icon-menu-outline" ></i>
+    </div>
+  </div>
+</div>
+
+<div class="menu-container" style="height: 0;opacity: 0;">
+<nav class="menu-list">
+  
+    
+      <a href="/" class="menu purple-link">
+        首页
+      </a>
+    
+  
+    
+      <a href="/tags" class="menu purple-link">
+        标签
+      </a>
+    
+  
+    
+      <a href="/memo" class="menu purple-link">
+        便笺
+      </a>
+    
+  
+    
+      <a href="/archives" class="menu purple-link">
+        归档
+      </a>
+    
+  
+    
+      <a href="/about" class="menu purple-link">
+        关于
+      </a>
+    
+  
+</nav>
+</div>
+
+
+
+  <div class="content-container">
+    <div class="post-detail">
+      
+      <h2 class="post-title">原子读写锁 —— 测试</h2>
+      <div class="post-info post-detail-info">
+        <span><i class="icon icon-calendar-outline"></i> 2025-01-14</span>
+        
+          <span>
+          <i class="icon icon-pricetags-outline"></i>
+            
+              <a href="/tags/C/">
+              C++
+                
+                  ，
+                
+              </a>
+            
+              <a href="/tags/Async/">
+              Async
+                
+                  ，
+                
+              </a>
+            
+              <a href="/tags/HPC/">
+              HPC
+                
+              </a>
+            
+          </span>
+        
+      </div>
+      <div class="post-content-wrapper">
+        <div class="post-content">
+          <blockquote>
+<p>上一篇加上测试会很长的篇幅，单独另写一篇</p>
+</blockquote>
+<hr>
+<p>原子读写锁的主要逻辑和相关的锁管理器均已实现完成，这里编写一个测试用例和标准库中的 <code>shared_mutex</code> 进行对比</p>
+<h1 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h1><h2 id="统一封装"><a href="#统一封装" class="headerlink" title="统一封装"></a>统一封装</h2><p>为了便于测试，这里对 <code>AtomicSharedMutex</code> 和 <code>shared_mutex</code> 进行统一封装：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">STDRWLock</span> &#123;</span><br><span class="line"> <span class="keyword">public</span>:</span><br><span class="line">  <span class="built_in">STDRWLock</span>() = <span class="keyword">default</span>;</span><br><span class="line">  ~<span class="built_in">STDRWLock</span>() = <span class="keyword">default</span>;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">RLock</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    mutex_.<span class="built_in">lock_shared</span>();</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">RUnlock</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    mutex_.<span class="built_in">unlock_shared</span>();</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">WLock</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    mutex_.<span class="built_in">lock</span>();</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">WUnlock</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    mutex_.<span class="built_in">unlock</span>();</span><br><span class="line">  &#125;</span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  std::shared_mutex mutex_;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">AtomicRWLock</span> &#123;</span><br><span class="line"> <span class="keyword">public</span>:</span><br><span class="line">  <span class="built_in">AtomicRWLock</span>() = <span class="keyword">default</span>;</span><br><span class="line">  ~<span class="built_in">AtomicRWLock</span>() = <span class="keyword">default</span>;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">RLock</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    mutex_.<span class="built_in">LockShared</span>();</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">RUnlock</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    mutex_.<span class="built_in">UnlockShared</span>();</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">WLock</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    mutex_.<span class="built_in">Lock</span>();</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">WUnlock</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    mutex_.<span class="built_in">Unlock</span>();</span><br><span class="line">  &#125;</span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  AtomicSharedMutex mutex_;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h2 id="实现基础测试用例"><a href="#实现基础测试用例" class="headerlink" title="实现基础测试用例"></a>实现基础测试用例</h2><p>实现一个模版类用于测试不同的锁：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">Lock</span>&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">RWLockBenchMark</span> &#123;</span><br><span class="line"> <span class="keyword">public</span>:</span><br><span class="line">  <span class="built_in">RWLockBenchMark</span>() = <span class="keyword">default</span>;</span><br><span class="line">  ~<span class="built_in">RWLockBenchMark</span>() = <span class="keyword">default</span>;</span><br><span class="line">  <span class="function"><span class="type">int</span> <span class="title">GetValue</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="type">int</span> value = <span class="number">0</span>;</span><br><span class="line">    lock_.<span class="built_in">RLock</span>();</span><br><span class="line">    value = num_;</span><br><span class="line">    lock_.<span class="built_in">RUnlock</span>();</span><br><span class="line">    <span class="keyword">return</span> value;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="function"><span class="type">void</span> <span class="title">ModifyValue</span><span class="params">(<span class="type">int</span>&amp; value)</span> </span>&#123;</span><br><span class="line">    lock_.<span class="built_in">WLock</span>();</span><br><span class="line">    num_ = value;</span><br><span class="line">    lock_.<span class="built_in">WUnlock</span>();</span><br><span class="line">  &#125;</span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  <span class="type">int</span> num_;</span><br><span class="line">  Lock lock_;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h2 id="实现单元测试"><a href="#实现单元测试" class="headerlink" title="实现单元测试"></a>实现单元测试</h2><p>实现基础的单元测试，同时针对标准库与原子实现对应的测试函数，这里的结果以元组的形式进行输出便于后续使用脚本语言进行分析：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment"> * 测试线程数</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="type">int</span> g_thread_count        = <span class="number">4</span>;</span><br><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment"> * 循环次数</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="type">int</span> g_loop_count          = <span class="number">10000</span>;</span><br><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment"> * 测试迭代次数</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="type">int</span> g_epoch               = <span class="number">10</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// ...</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">Lock</span>&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">test_impl</span><span class="params">(<span class="type">clock_t</span>&amp; reader_total, <span class="type">clock_t</span>&amp; writer_total)</span> </span>&#123;</span><br><span class="line">  RWLockBenchMark&lt;Lock&gt; ops;</span><br><span class="line">  <span class="type">clock_t</span> writer_spend_time&#123;&#125;, reader_spend_time[g_thread_count]&#123;&#125;, reader_time &#123;&#125;;</span><br><span class="line">  std::thread* reader_ths[g_thread_count]&#123;&#125;;</span><br><span class="line">  std::thread writer_th;</span><br><span class="line">  <span class="type">int</span> value;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">auto</span> reader = [&amp;](<span class="type">int</span> index) &#123;</span><br><span class="line">    <span class="type">clock_t</span> start = <span class="built_in">clock</span>();</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; g_loop_count; i++) &#123;</span><br><span class="line">      value = ops.<span class="built_in">GetValue</span>();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="type">clock_t</span> end = <span class="built_in">clock</span>();</span><br><span class="line">    reader_spend_time[index] = end - start;</span><br><span class="line">  &#125;;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">auto</span> writer = [&amp;]&#123;</span><br><span class="line">    <span class="type">clock_t</span> start = <span class="built_in">clock</span>();</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; g_loop_count; i++) &#123;</span><br><span class="line">      ops.<span class="built_in">ModifyValue</span>(i);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="type">clock_t</span> end = <span class="built_in">clock</span>();</span><br><span class="line">    writer_spend_time = end - start;</span><br><span class="line">  &#125;;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; g_thread_count; i++) &#123;</span><br><span class="line">    reader_ths[i] = <span class="keyword">new</span> std::<span class="built_in">thread</span>(reader, i);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  writer_th = std::<span class="built_in">thread</span>(writer);</span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; g_thread_count; i++) &#123;</span><br><span class="line">    reader_ths[i]-&gt;<span class="built_in">join</span>();</span><br><span class="line">  &#125;</span><br><span class="line">  writer_th.<span class="built_in">join</span>();</span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; g_thread_count; i++) &#123;</span><br><span class="line">    reader_time += reader_spend_time[i];</span><br><span class="line">  &#125;</span><br><span class="line">  reader_time /= g_thread_count;</span><br><span class="line"></span><br><span class="line">  reader_total = reader_time;</span><br><span class="line">  writer_total = writer_spend_time;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">std_test</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="type">clock_t</span> writer_spend, reader_spend;</span><br><span class="line">  <span class="type">clock_t</span> writer_spend_sum&#123;&#125;, reader_spend_sum&#123;&#125;;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; g_epoch; i++) &#123;</span><br><span class="line">    <span class="built_in">test_impl</span>&lt;STDRWLock&gt;(reader_spend, writer_spend);</span><br><span class="line">    writer_spend_sum += writer_spend;</span><br><span class="line">    reader_spend_sum += reader_spend;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;(%d, %ld, %ld)\n&quot;</span>, g_thread_count, reader_spend_sum / g_epoch, writer_spend_sum / g_epoch);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">atomic_test</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  <span class="type">clock_t</span> writer_spend, reader_spend;</span><br><span class="line">  <span class="type">clock_t</span> writer_spend_sum&#123;&#125;, reader_spend_sum&#123;&#125;;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; g_epoch; i++) &#123;</span><br><span class="line">    <span class="built_in">test_impl</span>&lt;AtomicRWLock&gt;(reader_spend, writer_spend);</span><br><span class="line">    writer_spend_sum += writer_spend;</span><br><span class="line">    reader_spend_sum += reader_spend;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;(%d, %ld, %ld)\n&quot;</span>, g_thread_count, reader_spend_sum / g_epoch, writer_spend_sum / g_epoch);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h1 id="测试"><a href="#测试" class="headerlink" title="测试"></a>测试</h1><blockquote>
+<p>由于手边只有一种类型的 <em>Arm</em> 设备，虽然是 <em>A58</em> 但都是 <em>ArmV7</em> 的版本，这里暂时只能使用这两种进行对比</p>
+</blockquote>
+<p><strong>测试设备：</strong></p>
+<ul>
+<li>Intel(R) Core(TM) i5-7300HQ 4核</li>
+<li>A58-ArmV7 4核</li>
+</ul>
+<p><strong>编译选项</strong><br>两者均以 <code>-O2</code> 等级进行优化生成</p>
+<p><strong>读写比例</strong><br>测试的线程读写线程比例为 $[2, 100] : 1$ ，随着读者线程数的上升统计读写线程进行完整操作消耗时间的平均值</p>
+<p><strong>图表颜色说明</strong></p>
+<ul>
+<li>蓝线为标准库实现</li>
+<li>红线为原子实现</li>
+</ul>
+<h2 id="X86"><a href="#X86" class="headerlink" title="X86"></a>X86</h2><p>X86 下的测试结果</p>
+<pre class="mermaid">---
+config:
+    xyChart:
+        width: 900
+        height: 600
+    themeVariables:
+        xyChart:
+            plotColorPalette: "#28678D,#f34544"
+---
+
+xychart-beta
+title "读者操作"
+x-axis "读者线程数" 2 --> 100
+y-axis "操作消耗平均时间（ms）"
+line [1113, 2398, 2298, 1355, 1515, 1775, 1593, 1711, 585, 1179, 1684, 1778, 1779, 1777, 1635, 1880, 1562, 1563, 1386, 1648, 1639, 1762, 1759, 1682, 1810, 1572, 1535, 1020, 1804, 1469, 1710, 1595, 1857, 1713, 1778, 1840, 1602, 1712, 1678, 1623, 1899, 1409, 1624, 1631, 1822, 1763, 1648, 1734, 1535, 1474, 1418, 1676, 1759, 1853, 1679, 1554, 1853, 1446, 1394, 1630, 1697, 1401, 1646, 1633, 1907, 1437, 1859, 1642, 1339, 1685, 1644, 1759, 1513, 1491, 1597, 1732, 1745, 1785, 1612, 1558, 1662, 1909, 1825, 1556, 1769, 1688, 1707, 1633, 1880, 1763, 1644, 1805, 1760, 1641, 1616, 1599, 1872, 1664, 1863, 1843]
+line [148, 223, 220, 295, 340, 374, 456, 424, 508, 642, 639, 537, 514, 767, 768, 902, 946, 743, 1139, 1066, 1115, 1199, 937, 828, 761, 880, 1274, 1328, 1694, 1984, 2060, 1663, 2150, 1857, 2057, 1927, 2562, 2247, 2706, 2146, 2549, 3159, 2722, 3591, 4072, 2789, 2988, 2738, 2978, 4366, 2737, 2227, 2350, 4169, 3659, 3911, 3272, 3503, 4808, 5675, 3733, 4616, 4769, 2860, 3903, 2554, 3733, 4283, 3347, 4527, 4993, 3682, 4607, 3590, 4797, 4264, 3591, 4173, 4433, 4130, 4328, 4294, 6093, 4001, 4038, 4253, 4219, 3455, 4166, 5482, 5105, 3708, 3998, 4370, 3843, 4254, 3909, 3932, 4755]</pre>
+
+<pre class="mermaid">---
+config:
+    xyChart:
+        width: 900
+        height: 600
+    themeVariables:
+        xyChart:
+            plotColorPalette: "#28678D,#f34544"
+---
+
+xychart-beta
+title "写者操作"
+x-axis "读者线程数" 2 --> 100
+y-axis "操作消耗平均时间（ms）"
+line [1290, 3892, 4222, 2694, 2595, 3900, 3116, 3012, 2448, 2580, 3334, 3658, 3082, 4245, 2419, 2291, 2019, 2060, 1424, 3642, 3095, 2644, 4063, 4677, 4144, 3035, 3078, 2299, 3988, 2584, 3461, 2501, 3945, 3364, 3777, 4627, 2947, 3468, 2752, 3683, 3719, 3869, 3839, 3670, 3025, 3881, 2755, 3984, 3156, 2906, 3739, 2512, 3832, 3884, 2724, 2544, 2981, 2167, 4049, 4412, 3262, 2129, 3312, 3298, 2783, 3364, 2648, 3441, 3623, 3561, 4197, 3513, 3104, 2788, 2645, 3689, 3041, 3292, 2598, 4888, 3058, 3247, 2879, 2881, 3627, 3246, 5128, 2906, 3508, 4363, 2441, 3251, 3862, 4574, 3496, 3500, 3551, 3889, 3178, 4238]
+line [131, 156, 131, 166, 179, 235, 267, 233, 288, 451, 390, 368, 368, 503, 533, 579, 517, 532, 703, 589, 876, 795, 772, 529, 366, 722, 865, 1067, 900, 1310, 1642, 1025, 1650, 1352, 1012, 1829, 1920, 1772, 1848, 1536, 2147, 1660, 1557, 2892, 2928, 1843, 1845, 561, 2160, 1902, 1821, 848, 1271, 1161, 2022, 2273, 1965, 1789, 2518, 2755, 2199, 2337, 2168, 1082, 2050, 1037, 1830, 1897, 898, 2368, 1192, 1968, 1147, 1803, 1617, 1800, 1340, 1944, 1794, 1214, 2017, 1993, 2478, 1915, 1164, 1503, 1479, 1486, 1300, 2018, 2074, 1579, 1267, 1917, 1627, 1844, 2384, 1827, 2388]</pre>
+
+<h2 id="A58-ArmV7"><a href="#A58-ArmV7" class="headerlink" title="A58 - ArmV7"></a>A58 - ArmV7</h2><pre class="mermaid">---
+config:
+    xyChart:
+        width: 900
+        height: 600
+    themeVariables:
+        xyChart:
+            plotColorPalette: "#28678D,#f34544"
+---
+
+xychart-beta
+title "读者操作"
+x-axis "读者线程数" 2 --> 100
+y-axis "操作消耗平均时间（ms）"
+line [2457, 2534, 3098, 3555, 2603, 2752, 2182, 2549, 2008, 2224, 2276, 1920, 1883, 1972, 1828, 1795, 1914, 2013, 1934, 2692, 2190, 2667, 2439, 2265, 2556, 2413, 2317, 2288, 2327, 2241, 2454, 2293, 2100, 2433, 2223, 2191, 2349, 2108, 1859, 2288, 2270, 2163, 2177, 2029, 2106, 2020, 1959, 2258, 2204, 2069, 2149, 1969, 1918, 2047, 2216, 2050, 1946, 1941, 1891, 1914, 1931, 2124, 1935, 1898, 1897, 1784, 2034, 2005, 1888, 1893, 1829, 1808, 1923, 1952, 1997, 1970, 1887, 1859, 1891, 1899, 1772, 1907, 1841, 1887, 1949, 1854, 1823, 1932, 1881, 1877, 1796, 1814, 1909, 1927, 1832, 1814, 1886, 1844, 1819]
+line [201, 183, 209, 260, 301, 371, 361, 382, 527, 588, 554, 514, 566, 634, 652, 629, 576, 629, 659, 715, 677, 868, 720, 779, 830, 933, 935, 959, 890, 1217, 929, 967, 1002, 1021, 1084, 1064, 1367, 1169, 1184, 1428, 1223, 1317, 1304, 1385, 1373, 1481, 1419, 1418, 1439, 1417, 1442, 1423, 1403, 1504, 1431, 1470, 1540, 1548, 1547, 1604, 1574, 1566, 1568, 1618, 1824, 2018, 1733, 1707, 1697, 1697, 1760, 1753, 1828, 1729, 1817, 1800, 1856, 1910, 1904, 1821, 1825, 1844, 1920, 1916, 1872, 1988, 1950, 1982, 1951, 2006, 1917, 1983, 2003, 1928, 1916, 2062, 2012, 2053, 2143]</pre>
+
+<pre class="mermaid">---
+config:
+    xyChart:
+        width: 900
+        height: 600
+    themeVariables:
+        xyChart:
+            plotColorPalette: "#28678D,#f34544"
+---
+
+xychart-beta
+title "写者操作"
+x-axis "读者线程数" 2 --> 100
+y-axis "操作消耗平均时间（ms）"
+line [3789, 3695, 5413, 11001, 9174, 10076, 5790, 8715, 3593, 5966, 6616, 3933, 3498, 5221, 3953, 5069, 7497, 5400, 5790, 9477, 5003, 10011, 11999, 10363, 12755, 12189, 11128, 10552, 13025, 11198, 10668, 8748, 7696, 14514, 13213, 9938, 8251, 8354, 5258, 9767, 10209, 9887, 10354, 10827, 8651, 9789, 8060, 10968, 13114, 8849, 10323, 7687, 7386, 10777, 12034, 9359, 8319, 7868, 6982, 7863, 9990, 11183, 10215, 8532, 8367, 5561, 8930, 11887, 8338, 8045, 4703, 6089, 10610, 6788, 7118, 8658, 7816, 5522, 8628, 8273, 7855, 10658, 6850, 6248, 8997, 9190, 9267, 7038, 11003, 9391, 8637, 6109, 7737, 9697, 5912, 8634, 8606, 8555, 7449]
+line [251, 182, 215, 259, 301, 354, 354, 386, 480, 539, 581, 560, 611, 738, 676, 714, 669, 703, 743, 716, 673, 900, 918, 841, 923, 1004, 1006, 1054, 923, 1318, 1032, 1095, 1001, 1151, 1191, 1182, 1512, 1160, 1245, 1279, 1345, 1339, 1279, 1362, 1116, 1647, 1440, 1445, 1323, 1564, 1175, 1463, 1533, 1489, 1585, 1443, 1648, 1823, 1730, 1697, 1722, 1821, 1672, 1745, 1981, 1666, 1670, 2159, 1765, 2021, 1662, 1841, 2027, 1890, 1936, 1945, 2045, 1962, 1924, 1978, 2029, 1983, 2056, 2403, 2088, 2114, 2196, 2343, 2279, 2235, 2022, 2231, 2113, 2029, 1814, 2382, 2193, 2182, 1997]</pre>
+
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>综合来看，随着读者线程数的上升，写者操作在一定程度上会保持着一个良好的状态，这个在 <em>Arm</em> 上的表现尤为明显，但是读者操作在不同的架构下均会在到达一定数量时的平均耗时会超过内核调度</p>
+<h1 id="总结-1"><a href="#总结-1" class="headerlink" title="总结"></a>总结</h1><p>不难看出，原子操作更加适用于快速响应的轻量线程任务管理中，对于高并发来说，采用内核进行管理是最佳的选择，毕竟内核中会有一个托管队列用于管理对应的互斥锁。同时，在不同的架构下，线程数对原子操作所产生的影响是不同的，这个需要根据具体的场景进行测试才能做出妥善的选择</p>
+
+        </div>
+          
+        <div class="top-div">
+          <ol class="top-box"><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E5%AE%9E%E7%8E%B0"><span class="top-box-text">实现</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E7%BB%9F%E4%B8%80%E5%B0%81%E8%A3%85"><span class="top-box-text">统一封装</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%AE%9E%E7%8E%B0%E5%9F%BA%E7%A1%80%E6%B5%8B%E8%AF%95%E7%94%A8%E4%BE%8B"><span class="top-box-text">实现基础测试用例</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E5%AE%9E%E7%8E%B0%E5%8D%95%E5%85%83%E6%B5%8B%E8%AF%95"><span class="top-box-text">实现单元测试</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%B5%8B%E8%AF%95"><span class="top-box-text">测试</span></a><ol class="top-box-child"><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#X86"><span class="top-box-text">X86</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#A58-ArmV7"><span class="top-box-text">A58 - ArmV7</span></a></li><li class="top-box-item top-box-level-2"><a class="top-box-link" href="#%E6%80%BB%E7%BB%93"><span class="top-box-text">总结</span></a></li></ol></li><li class="top-box-item top-box-level-1"><a class="top-box-link" href="#%E6%80%BB%E7%BB%93-1"><span class="top-box-text">总结</span></a></li></ol>
+        </div>
+          
+      </div>
+    </div>
+
+    
+      <div class="next-post">
+        <a class="purple-link" href="/2025/01/10/atomic-rwlock-impl/">
+          <h3 class="post-title">
+            下一篇：原子读写锁 —— 实现
+          </h3>
+        </a>
+      </div>
+    
+  </div>
+
+
+    <div id="gitalk-container"></div>
+
+
+
+
+
+
+<script>
+    (function () {
+        const jq = document.createElement('script');
+        jq.src = "/js/twikoo.min.js";
+        document.getElementsByTagName('body')[0].appendChild(jq);
+
+        const config = {"envId":"https://zyxeeker-blog.hf.space","region":null,"mark":null};
+        jq.onload = function () {
+            twikoo.init({
+                envId: config.envId,
+                el: '#gitalk-container',
+                region: config.region,
+                path: location.pathname + (config.mark ? '?mark=' + config.mark : ''),
+                lang: config.language,
+            });
+        }
+    })()
+</script>
+
+
+
+
+<footer>
+    <div class="site-footer">
+        <div class="social-container">
+            
+            
+            <a aria-label="跳转至github" href="https://github.com/zyxeeker" target="_blank">
+                <i class="icon icon-github"></i>
+            </a>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+        </div>
+        
+        Powered by <a href="https://hexo.io/" target="_blank">Hexo</a> <a
+            href="https://github.com/f-dong/hexo-theme-minimalism" target="_blank">Theme</a>
+        
+        
+        
+        
+        
+        
+    </div>
+    <!-- mermaid -->
+    <script src="https://unpkg.com/mermaid@10.9.0/dist/mermaid.min.js"></script>
+    <script>
+        if (window.mermaid) {
+            // 检查用户的首选颜色模式
+            const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            mermaid.initialize({
+                theme: isDarkMode ? 'neutral' : 'base'
+            });
+        }
+    </script>
+    <!-- diagrams -->
+    <script type="text/javascript" src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+    <style type="text/css">
+        .MathJax svg {
+          filter: none;
+        }
+        @media (prefers-color-scheme: dark) {
+            svg {
+                filter: invert(93%) hue-rotate(180deg);
+                background-color: transparent !important;
+            }
+
+            image {
+                filter: invert(100%) hue-rotate(180deg) saturate(1.25);
+            }
+        }
+
+        .mxgraph-container {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</footer>
+
+
+</div>
+</div>
+
+<script id="hexo-configurations"> window.theme_config = {"image":{"lazyload_enable":true,"photo_zoom":"simple-lightbox"}}; window.is_post = true; </script>
+
+<script src="/js/main.js"></script>
+
+
+
+
+
+
+</body>
+
+</html>
+
